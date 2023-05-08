@@ -1,0 +1,2237 @@
+# Load necessary packages and functions
+library(xlsx)
+library(table1xls)
+library(foreign)
+library(readstata13)
+
+make_inv_norm_y=function(y){
+  ecdf_y=ecdf(y)
+  return(qnorm(ecdf_y(y)*(length(y)/(length(y)+1))))
+}
+
+zscore = function(x){
+  pop_sd <- sd(x, na.rm = T)*sqrt((sum(!is.na(x))-1)/(sum(!is.na(x))))
+  pop_mean <- mean(x, na.rm = T)
+  z <- (x - pop_mean)/pop_sd
+  z <- z^2
+  return(z)
+}
+
+# Load in UKB data
+ukb_pheno = read.dta13("~/ukbiobank/pheno_Ukbio.dta")
+
+# Limit to Brits only
+brit_ids = na.omit(ukb_pheno$n_eid[ukb_pheno$n_22006_0 == 1 & is.na(ukb_pheno$n_22027_0) & ukb_pheno$n_22021_0_0 != 10 & is.na(ukb_pheno$n_22019_0)])
+
+ukb_pheno = ukb_pheno[ukb_pheno$n_eid %in% brit_ids,]
+ukb_pheno = ukb_pheno[,which(!grepl("n_22009_0", colnames(ukb_pheno)))]
+ukb_pheno$related = ifelse(ukb_pheno$n_22021_0_0 < 0, NA, ukb_pheno$n_22021_0_0)
+ukb_pheno$related = ifelse(ukb_pheno$related > 0, 1, 0)
+ukb_pheno = subset(ukb_pheno, is.na(ukb_pheno$related) == F)
+
+
+#Construct outcome variables
+
+# A. BMI
+ukb_pheno$bmi <- as.numeric(ukb_pheno$n_21001_0_0)
+
+ukb_pheno$inv_norm_bmi  = ukb_pheno$bmi
+ukb_pheno$inv_norm_bmi[ukb_pheno$related == 0] = make_inv_norm_y(ukb_pheno$bmi[ukb_pheno$related == 0])
+ukb_pheno$inv_norm_bmi[ukb_pheno$related == 1] = make_inv_norm_y(ukb_pheno$bmi[ukb_pheno$related == 1])
+
+ukb_pheno$z_bmi  = ukb_pheno$bmi
+ukb_pheno$z_bmi[ukb_pheno$related == 0] = zscore(ukb_pheno$bmi[ukb_pheno$related == 0])
+ukb_pheno$z_bmi[ukb_pheno$related == 1] = zscore(ukb_pheno$bmi[ukb_pheno$related == 1])
+
+
+# B. Height
+ukb_pheno$height <- as.numeric(ukb_pheno$n_50_0_0)
+
+ukb_pheno$inv_norm_height  = ukb_pheno$height
+ukb_pheno$inv_norm_height[ukb_pheno$related == 0] = make_inv_norm_y(ukb_pheno$height[ukb_pheno$related == 0])
+ukb_pheno$inv_norm_height[ukb_pheno$related == 1] = make_inv_norm_y(ukb_pheno$height[ukb_pheno$related == 1])
+
+ukb_pheno$z_height  = ukb_pheno$height
+ukb_pheno$z_height[ukb_pheno$related == 0] = zscore(ukb_pheno$height[ukb_pheno$related == 0])
+ukb_pheno$z_height[ukb_pheno$related == 1] = zscore(ukb_pheno$height[ukb_pheno$related == 1])
+
+# C. Eduyears 
+ukb_pheno$n_6138_0_0_recode = as.numeric(ukb_pheno$n_6138_0_0)
+
+new_val = rep(NA, length(ukb_pheno$n_6138_0_0_recode))
+new_val = ifelse(ukb_pheno$n_6138_0_0_recode == 1, 20, new_val)
+new_val = ifelse(ukb_pheno$n_6138_0_0_recode == 2, 13, new_val)
+new_val = ifelse(ukb_pheno$n_6138_0_0_recode == 3, 10, new_val)
+new_val = ifelse(ukb_pheno$n_6138_0_0_recode == 4, 10, new_val)
+new_val = ifelse(ukb_pheno$n_6138_0_0_recode == -7, 7, new_val)
+
+ukb_pheno$education = new_val
+
+ukb_pheno$inv_norm_education = ukb_pheno$education
+ukb_pheno$inv_norm_education[ukb_pheno$related == 0] = make_inv_norm_y(ukb_pheno$inv_norm_education[ukb_pheno$related == 0])
+ukb_pheno$inv_norm_education[ukb_pheno$related == 1] = make_inv_norm_y(ukb_pheno$inv_norm_education[ukb_pheno$related == 1])
+
+ukb_pheno$z_education  = ukb_pheno$education
+ukb_pheno$z_education[ukb_pheno$related == 0] = zscore(ukb_pheno$education[ukb_pheno$related == 0])
+ukb_pheno$z_education[ukb_pheno$related == 1] = zscore(ukb_pheno$education[ukb_pheno$related == 1])
+
+
+
+# D. Number of children ever born
+ukb_pheno$n_2405_0_0_recode = as.numeric(ukb_pheno$n_2405_0_0)
+ukb_pheno$n_2405_0_0_recode = ifelse(ukb_pheno$n_2405_0_0_recode < 0, NA, ukb_pheno$n_2405_0_0_recode)
+ukb_pheno$n_2734_0_0_recode = as.numeric(ukb_pheno$n_2734_0_0)
+ukb_pheno$n_2734_0_0_recode = ifelse(ukb_pheno$n_2734_0_0_recode < 0, NA, ukb_pheno$n_2734_0_0_recode)
+ukb_pheno$num_children = ifelse(is.na(ukb_pheno$n_2405_0_0_recode), ukb_pheno$n_2734_0_0_recode, ukb_pheno$n_2405_0_0_recode)
+ukb_pheno$num_children = ifelse(ukb_pheno$num_children > 15, NA, ukb_pheno$num_children)
+
+ukb_pheno$inv_norm_num_children = ukb_pheno$num_children
+ukb_pheno$inv_norm_num_children[ukb_pheno$related == 0] = make_inv_norm_y(ukb_pheno$inv_norm_num_children[ukb_pheno$related == 0])
+ukb_pheno$inv_norm_num_children[ukb_pheno$related == 1] = make_inv_norm_y(ukb_pheno$inv_norm_num_children[ukb_pheno$related == 1])
+
+ukb_pheno$z_num_children  = ukb_pheno$num_children
+ukb_pheno$z_num_children[ukb_pheno$related == 0] = zscore(ukb_pheno$num_children[ukb_pheno$related == 0])
+ukb_pheno$z_num_children[ukb_pheno$related == 1] = zscore(ukb_pheno$num_children[ukb_pheno$related == 1])
+
+# Construct control variables
+ukb_pheno$sex <- as.numeric(ukb_pheno$n_31_0_0.x)
+ukb_pheno$age <- as.numeric(ukb_pheno$n_21003_0_0.x)
+ukb_pheno$age2 = ukb_pheno$age^2
+ukb_pheno$age3 = ukb_pheno$age^3
+ukb_pheno$age_sex = ukb_pheno$age * ukb_pheno$sex
+ukb_pheno$age2_sex = ukb_pheno$age2 * ukb_pheno$sex
+ukb_pheno$age3_sex = ukb_pheno$age3 * ukb_pheno$sex
+ukb_pheno$array <- ifelse(as.numeric(ukb_pheno$n_22000_0_0.x) > 0, 1, 0)
+colnames(ukb_pheno)[grepl("n_22009_0_", colnames(ukb_pheno))] = paste0("PC", 1:40)
+
+saveRDS(ukb_pheno, "phenos_for_vpgs.RDS")
+
+
+
+### PLOTTING REGULAR AND TRANSFORMED VARIABLES
+transformed_vars = grep("inv_norm", colnames(ukb_pheno), value = T)
+original_vars = gsub("inv_norm_", "", transformed_vars)
+
+combined_vars = c()
+for(i in 1:length(original_vars)){
+  combined_vars = c(combined_vars, original_vars[i])
+  combined_vars = c(combined_vars, transformed_vars[i])
+}
+
+to_hist = ukb_pheno[,combined_vars]
+
+jpeg("histograms_vpgs_04_10.jpeg", width = 1000, height = 1000)
+par(mfrow = c(4, 4))
+for(i in 1:ncol(to_hist)){
+  hist(to_hist[,i], xlab = colnames(to_hist)[i], main = "", col = "grey80", border = "grey40")
+}
+dev.off()
+
+
+### PREPARING DATA FILES FOR VARIOUS ANALYSES
+ukb_pheno = readRDS("phenos_for_vpgs.RDS")
+ukb_pheno$FID = ukb_pheno$n_eid
+ukb_pheno$IID = ukb_pheno$n_eid
+
+set.seed(1953)
+test_set = sample(1:nrow(ukb_pheno), round(nrow(ukb_pheno) * 0.2))
+training_set = c(1:nrow(ukb_pheno))[!c(1:nrow(ukb_pheno)) %in% test_set]
+
+ukb_pheno_test = ukb_pheno[test_set,]
+ukb_pheno_training = ukb_pheno[training_set,]
+
+saveRDS(ukb_pheno_test, "ukb_pheno_test.RDS")
+saveRDS(ukb_pheno_training, "ukb_pheno_training.RDS")
+
+ukb_pheno = readRDS("ukb_pheno_training.RDS")
+
+# split to relateds and unrelateds
+relateds = subset(ukb_pheno, related == 1)
+unrelateds = subset(ukb_pheno, related == 0)
+
+# ID relevant phenotypes
+transformed_vars = grep("inv_norm", colnames(ukb_pheno), value = T)
+original_vars = gsub("inv_norm_", "", transformed_vars)
+zscore_vars = paste0("z_", original_vars)
+
+all_outcomes = c(original_vars, transformed_vars, zscore_vars)
+
+# loop through creating requisite files for each phenotype
+for(i in all_outcomes){
+  
+  # outcomes
+  related_phenotype = relateds[,c("FID", "IID", i)]
+  related_controls = relateds[,c("FID", "IID", "sex", "age", "age2", "age3", "age_sex", "age2_sex", "age3_sex", "array", paste0("PC", 1:40))]
+  
+  unrelated_phenotype = unrelateds[,c("FID", "IID", i)]
+  unrelated_controls = unrelateds[,c("FID", "IID", "sex", "age", "age2", "age3", "age_sex", "age2_sex", "age3_sex", "array", paste0("PC", 1:40))]
+  
+  gwas_controls = unrelateds[,c("FID", "IID", "sex", "age", "array", paste0("PC", 1:40))]
+  gwas_controls = na.omit(gwas_controls)
+  
+  if(i %in% zscore_vars){
+    unrelated_phenotype[,i] = unrelated_phenotype[,i]^2
+    related_phenotype[,i] = related_phenotype[,i]^2
+  }
+  
+  # file names
+  file_name_related_phenotype = paste0(i, "_related_out.tab")
+  file_name_related_controls = paste0(i, "_related_control.tab")
+  
+  file_name_unrelated_phenotype = paste0(i, "_unrelated_out.tab")
+  file_name_unrelated_controls = paste0(i, "_unrelated_control.tab")
+  file_name_gwas_controls = paste0(i, "_unrelated_control_gwas.tab")
+  
+  # write to files
+  write.table(related_phenotype, file_name_related_phenotype, row.names = F, col.names = F, quote = F)
+  write.table(related_controls, file_name_related_controls, row.names = F, col.names = F, quote = F)
+  
+  write.table(unrelated_phenotype, file_name_unrelated_phenotype, row.names = F, col.names = F, quote = F)
+  write.table(unrelated_controls, file_name_unrelated_controls, row.names = F, col.names = F, quote = F)
+  write.table(gwas_controls, file_name_gwas_controls, row.names = F, col.names = F, quote = F)
+}
+
+
+ukb_pheno = readRDS("phenos_for_vpgs.RDS")
+ukb_pheno$FID = ukb_pheno$n_eid
+ukb_pheno$IID = ukb_pheno$n_eid
+
+# sib controls (just relateds controls tbh)
+sib_gwas_controls = ukb_pheno[,c("FID", "IID", "sex", "age", "array")]
+write.table(sib_gwas_controls, "~/vgwas/sib_gwas_controls.tab", row.names = F, col.names = F, quote = F)
+
+# construct sib data
+sibs = read.table("~/ukbiobank/british_siblings_official.txt", stringsAsFactors = F, header = T)
+sibs$ID1 = as.character(sibs$ID1)
+sibs$ID2 = as.character(sibs$ID2)
+
+for(i in transformed_vars){
+  
+  sibs$new_var_1 = ukb_pheno[match(sibs$ID1, ukb_pheno$IID), i]
+  sibs$new_var_2 = ukb_pheno[match(sibs$ID2, ukb_pheno$IID), i]
+  
+  var_sd = c()
+  var_mean = c()
+  for(j in 1:nrow(sibs)){
+    var_sd = c(var_sd, sd(c(sibs[j,"new_var_1"], sibs[j,"new_var_2"]), na.rm = T))
+    var_mean = c(var_mean, mean(c(sibs[j,"new_var_1"], sibs[j,"new_var_2"]), na.rm = T))
+  }
+  
+  sibs$var_sd = var_sd
+  sibs$var_mean = var_mean
+  
+  sd_resid = resid(lm(var_sd ~ var_mean, data = sibs))
+  
+  sibs$var_sd_resid = NA
+  sibs$var_sd_resid[as.numeric(names(sd_resid))] = sd_resid
+  
+  ukb_pheno$var_sib_sd = ifelse(is.na(sibs$var_sd[match(ukb_pheno$IID, sibs$ID1)]), sibs$var_sd[match(ukb_pheno$IID, sibs$ID2)], sibs$var_sd[match(ukb_pheno$IID, sibs$ID1)])
+  
+  ukb_pheno$var_sib_sd_resid = ifelse(is.na(sibs$var_sd_resid[match(ukb_pheno$IID, sibs$ID1)]), sibs$var_sd_resid[match(ukb_pheno$IID, sibs$ID2)], sibs$var_sd_resid[match(ukb_pheno$IID, sibs$ID1)])
+  
+  ukb_pheno$var_sib_sd_1 =sibs$var_sd[match(ukb_pheno$IID, sibs$ID1)]
+  ukb_pheno$var_sib_sd_2 =sibs$var_sd[match(ukb_pheno$IID, sibs$ID2)]
+  
+  ukb_pheno$var_sib_sd_resid_1 = sibs$var_sd_resid[match(ukb_pheno$IID, sibs$ID1)]
+  ukb_pheno$var_sib_sd_resid_2 = sibs$var_sd_resid[match(ukb_pheno$IID, sibs$ID2)]
+  
+  sib_pheno = subset(ukb_pheno, !is.na(ukb_pheno$var_sib_sd))
+  sib_pheno_1 = subset(ukb_pheno, !is.na(ukb_pheno$var_sib_sd_1))
+  sib_pheno_2 = subset(ukb_pheno, !is.na(ukb_pheno$var_sib_sd_2))
+  
+  sib_phenotype_1 = sib_pheno_1[,c("FID", "IID", "var_sib_sd_1")]
+  sib_phenotype_resid_1 = sib_pheno_1[,c("FID", "IID", "var_sib_sd_resid_1")]
+  write.table(sib_phenotype_1, paste0(i, "_sib_sd_1.tab"), row.names = F, col.names = F, quote = F)
+  write.table(sib_phenotype_resid_1, paste0(i, "_sib_sd_resid_1.tab"), row.names = F, col.names = F, quote = F)
+  
+  sib_phenotype_2 = sib_pheno_2[,c("FID", "IID", "var_sib_sd_2")]
+  sib_phenotype_resid_2 = sib_pheno_2[,c("FID", "IID", "var_sib_sd_resid_2")]
+  write.table(sib_phenotype_2, paste0(i, "_sib_sd_2.tab"), row.names = F, col.names = F, quote = F)
+  write.table(sib_phenotype_resid_2, paste0(i, "_sib_sd_resid_2.tab"), row.names = F, col.names = F, quote = F)
+  
+  sib_phenotype = sib_pheno[,c("FID", "IID", "var_sib_sd")]
+  sib_phenotype_resid = sib_pheno[,c("FID", "IID", "var_sib_sd_resid")]
+  write.table(sib_phenotype, paste0(i, "_sib_sd_all.tab"), row.names = F, col.names = F, quote = F)
+  write.table(sib_phenotype_resid, paste0(i, "_sib_sd_resid_all.tab"), row.names = F, col.names = F, quote = F)
+}
+
+## Sibling GWAS (example with height, we ran for all outcomes)
+#!/bin/bash
+for i in {1..22}
+do
+plink1.9 --bed ~/ukbiobank/EGAD10001226/ukb_cal_chr${i}_v2.bed --bim ~/ukbiobank/EGAD10001226/ukb_snp_chr${i}_v2.bim --fam ~/ukbiobank/EGAD10001226/ukb2227_cal_chr13_v2_s488366.fam --pheno ~/vgwas/inv_norm_height_sib_sd_resid_all.tab --linear hide-covar --covar ~/vgwas/sib_gwas_controls.tab --out ~/vgwas/sib_height_all_resid_gwas_$i &
+done
+
+## Regular GWAS (example with height, we ran for all outcomes)
+### BASH run 
+#!/bin/bash
+for i in {1..22}
+do
+plink1.9 --bed ~/ukbiobank/EGAD10001226/ukb_cal_chr${i}_v2.bed --bim ~/ukbiobank/EGAD10001226/ukb_snp_chr${i}_v2.bim --fam ~/ukbiobank/EGAD10001226/ukb2227_cal_chr13_v2_s488366.fam --pheno ~/vgwas/inv_norm_height_unrelated_out.tab --linear hide-covar --covar ~/vgwas/inv_norm_height_unrelated_control_gwas.tab --out ~/vgwas/inv_norm_height_gwas_$i &
+done
+
+## Squared-Z (example with height, we ran for all outcomes)
+#!/bin/bash
+for i in {1..22}
+do
+  plink1.9 --bed ~/ukbiobank/EGAD10001226/ukb_cal_chr${i}_v2.bed --bim ~/ukbiobank/EGAD10001226/ukb_snp_chr${i}_v2.bim --fam ~/ukbiobank/EGAD10001226/ukb2227_cal_chr13_v2_s488366.fam --pheno ~/vgwas/z_height_unrelated_out.tab --linear hide-covar --covar ~/vgwas/z_height_unrelated_control_gwas.tab --out ~/vgwas/z_height_gwas_$i &
+done
+
+## VQTL
+for i in {1..22}
+do
+./osca_Linux --vqtl --bfile ~/ukb_simplified/ukb_chr${i} --pheno ~/vgwas/inv_norm_height_unrelated_out_same_n.tab --covar ~/vgwas/inv_norm_height_unrelated_control_gwas_same_n.tab --vqtl-mtd 1 --out ~/vqtl_results/inv_norm_height_vqtl_same_n_${i} &
+done
+
+# Clean mGWAS results
+setwd("~/vpgs_gwas_results")
+all_files = list.files()
+
+vars = c("bmi", "height", "education", "num_children")
+file_headers = paste0("inv_norm_", vars, "_vpgs_gwas_")
+
+for(i in file_headers){
+  set_files = all_files[grepl(i, all_files)]
+  set_files = set_files[grepl(".assoc.linear", set_files)]
+  set_dfs = lapply(set_files, function(x) read.table(x, stringsAsFactors = F))
+  set_dfs = do.call("rbind", set_dfs)
+  colnames(set_dfs) = set_dfs[1,]
+  set_dfs = set_dfs[-1,]
+  set_dfs = subset(set_dfs, set_dfs$BETA != "<NA>")
+  set_dfs = subset(set_dfs, set_dfs$TEST == "ADD")
+  
+  file_name = paste0("~/vpgs_gwas_results/final_association_files/", i, "final.profile")
+  write.table(set_dfs, file = file_name, row.names = F, quote = F, sep = "\t")
+}
+
+
+## combine vqtl results into single files
+all_files = list.files()
+
+vars = c("bmi", "height", "education", "num_children")
+file_headers = paste0(vars, "_vqtl")
+
+for(i in file_headers){
+  set_files = all_files[grepl(i, all_files)]
+  set_files = set_files[grepl("\\.vqtl", set_files)]
+  set_dfs = lapply(set_files, function(x) read.table(x, stringsAsFactors = F, header = T))
+  set_dfs = do.call("rbind", set_dfs)
+  file_name = paste0("~/vpgs_gwas_results/final_association_files/", i, ".vqtl")
+  write.table(set_dfs, file = file_name, row.names = F, quote = F, sep = "\t")
+}
+
+## combine sib results into single files
+all_files = list.files()
+
+vars = c("bmi", "height", "education",  "num_children")
+file_headers = paste0("sib_", vars, "_2_resid_gwas")
+
+for(i in file_headers){
+  set_files = all_files[grepl(i, all_files)]
+  set_files = set_files[grepl("\\.assoc.linear", set_files)]
+  set_dfs = lapply(set_files, function(x) read.table(x, stringsAsFactors = F, header = T))
+  set_dfs = do.call("rbind", set_dfs)
+  file_name = paste0("~/vpgs_gwas_results/final_association_files/", i, ".profile")
+  write.table(set_dfs, file = file_name, row.names = F, quote = F, sep = "\t")
+}
+
+# HLMM
+R
+options(scipen=999)
+
+# use bed here to identify chromosome limits and run on chromosomes only
+bim_file = read.table("~/vgwas/ukb_hlmm.bim", stringsAsFactors = F, header = F)
+
+# get chromosme limits
+for(i in c(1:22)){
+  start = min(which(bim_file$V1 == i))
+  end = max(which(bim_file$V1 == i)) + 1
+  to_run = paste0("python hlmm_chr.py ~/vgwas/ukb_hlmm ", start, " ", end, " ~/vgwas/inv_norm_bmi_unrelated_out_same_n.tab ~/vgwas/inv_bmi_same_n_run/inv_norm_bmi_unrelateds_same_n", i, " --mean_covar ~/vgwas/inv_norm_bmi_unrelated_control_same_n.tab --var_covar ~/vgwas/inv_norm_bmi_unrelated_control_same_n.tab")
+  system(to_run)
+}
+
+for(i in c(1:22)){
+  start = min(which(bim_file$V1 == i))
+  end = max(which(bim_file$V1 == i)) + 1
+  to_run = paste0("python hlmm_chr.py ~/vgwas/ukb_hlmm ", start, " ", end, " ~/vgwas/inv_norm_bmi_related_out_same_n.tab ~/vgwas/inv_bmi_same_n_run/inv_norm_bmi_relateds_same_n", i, " --mean_covar ~/vgwas/inv_norm_bmi_related_control_same_n.tab --var_covar ~/vgwas/inv_norm_bmi_related_control_same_n.tab")
+  system(to_run)
+}
+
+## RUN META-ANALYSIS FOR RELATEDS & UNRELATEDS
+# Example for height
+cd generic-metal
+
+./metal
+
+SCHEME   STDERR
+MARKER   SNP
+WEIGHT   n
+FREQ     frequency
+EFFECT   var
+STDERR   var_se
+PVAL     var_pval
+
+PROCESS inv_norm_height_hlmm_unrelateds.tbl
+PROCESS inv_norm_height_hlmm_relateds.tbl
+
+# Execute meta-analysis
+OUTFILE inv_norm_height_hlmm_variance .tbl
+ANALYZE
+
+QUIT
+
+## Add dispersion effects
+
+R
+
+rm(list = ls())
+additive = read.table("inv_norm_height_hlmm_additive1.tbl", sep = "\t", header = T, stringsAsFactors = F)
+variance = read.table("inv_norm_height_hlmm_variance1.tbl", sep = "\t", header = T, stringsAsFactors = F)
+bim = read.table("~/vgwas/ukb_hlmm.bim", header = F, stringsAsFactors = F)
+#original = read.csv("~/PolygenicScores/41588_2018_225_MOESM3_ESM.csv", header = T, stringsAsFactors = F)
+
+additive_sub = additive[,c("MarkerName", "Effect", "StdErr", "P.value")]
+colnames(additive_sub) = c("SNP", "add", "add_se", "add_pval")
+
+variance_sub = variance[,c("MarkerName", "Effect", "StdErr", "P.value")]
+colnames(variance_sub) = c("SNP", "var", "var_se", "var_pval")
+
+all_df =  data.frame(chr = bim$V1[match(additive$MarkerName, bim$V2)], SNP = additive$MarkerName, a1 = bim$V5[match(additive$MarkerName, bim$V2)], a2 = bim$V6[match(additive$MarkerName, bim$V2)], stringsAsFactors = F)
+
+all_df = merge(all_df, additive_sub)
+all_df = merge(all_df, variance_sub)
+
+# all_df = all_df[match(original$SNP, all_df$SNP),]
+all_df = as.data.frame(na.omit(all_df))
+
+require(MASS)
+r_var_mean=rlm(var~0+add,data=all_df)
+
+mean_noise=mean(all_df$add_se^2,na.rm=T)
+noise_adjustment=1+mean_noise/(var(all_df$add,na.rm=T)-mean_noise)
+
+r_av=r_var_mean$coefficients[1]*noise_adjustment
+
+all_df$dispersion=all_df$var-r_av*all_df$add
+all_df$dispersion_se=sqrt(all_df$var_se^2+(r_av^2)*all_df$add_se^2)
+all_df$dispersion_t=all_df$dispersion/all_df$dispersion_se
+all_df$dispersion_pval=-log10(pchisq(all_df$dispersion_t^2,1,lower.tail=F))
+
+all_df = all_df[,c("chr", colnames(all_df)[which(colnames(all_df) != "chr")])]
+colnames(all_df)[3:4] = c("allele1", "allele2")
+all_df = all_df[order(all_df$chr, decreasing = F),]
+
+write.table(all_df, "height_hlmm.profile", col.names = T, row.names = F, quote = F, sep = "\t")
+
+# Clean z-score results
+setwd("~/vpgs_gwas_results")
+all_files = list.files()
+
+vars = c("bmi", "height", "education",  "num_children")
+file_headers = paste0("z_", vars, "_gwas_")
+
+for(i in file_headers){
+  set_files = all_files[grepl(i, all_files)]
+  set_files = set_files[grepl(".assoc.linear", set_files)]
+  set_dfs = lapply(set_files, function(x) read.table(x, stringsAsFactors = F))
+  set_dfs = do.call("rbind", set_dfs)
+  colnames(set_dfs) = set_dfs[1,]
+  set_dfs = set_dfs[-1,]
+  set_dfs = subset(set_dfs, set_dfs$BETA != "<NA>")
+  set_dfs = subset(set_dfs, set_dfs$TEST == "ADD")
+  
+  file_name = paste0("~/vpgs_gwas_results/final_association_files/", i, "final.profile")
+  write.table(set_dfs, file = file_name, row.names = F, quote = F, sep = "\t")
+}
+
+## Code for constructing PGS
+# Packages
+library(data.table)
+library(rstudioapi)
+library(dplyr)
+
+# this function aligns the snps between the UKB and the GWAS summary file
+gen_fliplist <- function(pathto_predfile,
+                         pathto_writesnps){
+
+
+  snps_notscored_df = read.table(pathto_predfile,
+                                 sep = "\t")
+  colnames(snps_notscored_df) = c('reason_notscored',
+                                  'snp')
+
+  print(sprintf('%s snps not scored because snps not present on chip',
+                nrow(snps_notscored_df %>% filter(reason_notscored == 'NOSNP'))))
+  print(sprintf('%s snps not scored because snps present on chip but not scored due to allele mismatch',
+                nrow(snps_notscored_df %>% filter(reason_notscored == 'NOALLELE'))))
+
+
+  # Subset to SNPs not scored because snp
+  # was present but no alleles in genetic df
+  # matched ref allele from consortium
+  # (contrast to the # not scored because of no snp)
+  snps_notscored_noallele = snps_notscored_df %>% filter(reason_notscored == "NOALLELE")
+
+  # Get names of snps (pulling out the rs#)
+  snps_notscored_names = regmatches(snps_notscored_noallele$snp,
+                                    regexpr("rs[0-9]+", snps_notscored_noallele$snp))
+
+  # Write snps whose alleles should be flipped to a file
+  write.table(snps_notscored_names,
+              pathto_writesnps,
+              col.names = FALSE, row.names = FALSE, quote = FALSE,
+              sep = "\t")
+
+  print('wrote text file with flipped snps')
+
+}
+
+# this function formats the data for use with plink
+format_PGSfiles_forplink <- function(df_allinfo,
+                                     nameof_SNPcol,
+                                     nameof_refallelecol,
+                                     nameof_effectsizecol,
+                                     dirname_storeoutput){
+
+  ## preprocess data to capitalize ref alleles column
+  data_cleaned = as.data.table(df_allinfo)
+  data_cleaned[, nameof_refallelecol] = sapply(data_cleaned[, .SD,
+                                                            .SDcols = nameof_refallelecol],
+                                               toupper)
+
+  ## first create and write snp file
+  snp_df = data_cleaned[, .SD, .SDcols = nameof_SNPcol]
+  file_plus_dir = sprintf("%s%s",
+                          dirname_storeoutput,
+                          "snplist.txt")
+  write.table(snp_df, file_plus_dir,
+              row.names = FALSE, col.names = FALSE, quote = FALSE,
+              sep = "\t")
+
+  print('wrote SNP list to directory')
+
+  ## then create and write snp + allele file
+  ## has step to convert all reference alleles to uppercase
+  snpallele_df = data_cleaned[, .SD, .SDcols = c(nameof_SNPcol,nameof_refallelecol)]
+
+  file_plus_dir = sprintf("%s%s",
+                          dirname_storeoutput,
+                          "refallele.txt")
+  write.table(snpallele_df, file_plus_dir,
+              row.names = FALSE, col.names = FALSE, quote = FALSE,
+              sep = "\t")
+
+  print('wrote SNP + ref alleles to directory')
+
+  ## finally, create and write snp+ allele + weights files
+  snpweights_df = data_cleaned[, .SD, .SDcols = c(nameof_SNPcol,
+                                                  nameof_refallelecol,
+                                                  nameof_effectsizecol)]
+  file_plus_dir = sprintf("%s%s",
+                          dirname_storeoutput,
+                          "beta.txt")
+  write.table(snpweights_df, file_plus_dir,
+              row.names = FALSE, col.names = FALSE, quote = FALSE,
+              sep = "\t")
+
+  print('wrote SNP + ref alleles + weights to directory')
+}
+
+# this function reads the summary file in question and puts it through the formatting function
+# sometimes, the data is separated by commas or colons, in which case you can change the sep = argument in read.table
+format_PGS_full = function(file = "file_here.csv", SNP = 'MarkerName', RefAllele = 'Allele1', Effect = 'b', Output = "~/"){
+  df = read.table(file, header=TRUE, stringsAsFactors=FALSE)
+  format_PGSfiles_forplink(df_allinfo = df,
+                           nameof_SNPcol = SNP,
+                           nameof_refallelecol = RefAllele,
+                           nameof_effectsizecol = Effect,
+                           dirname_storeoutput = Output)
+}
+
+# this is the main function for running PGS construction
+ukb_macro_PGS = function(new_folder_name = "height_PGS",
+         gwas_file_path = "height_hlmm.profile",
+         snp = "MarkerName", refallele = "Allele1", effect = "b", output_path = "~/",
+         ukb_file_path = "~/vgwas"){
+
+
+  # set up folder where everything is going
+  system(paste("mkdir", new_folder_name))
+  path_name = paste0("~/", new_folder_name, "/")
+
+  # Set up the reference allele files
+  format_PGS_full(file = gwas_file_path,
+                  SNP = snp, RefAllele = refallele, Effect = effect, Output = path_name)
+
+  # make folders for final and intermediate outputs
+  setwd(path_name)
+  system("mkdir intermediate_outputs")
+
+  # flip data, identified mismatched alleles
+  system(paste0("plink1.9 --bfile ", ukb_file_path, " --reference-allele refallele.txt --make-bed --out intermediate_outputs/refallele_df"))
+  system("plink1.9 --bfile intermediate_outputs/refallele_df --score beta.txt --out intermediate_outputs/score_PREFLIP")
+  gen_fliplist(pathto_predfile = "intermediate_outputs/score_PREFLIP.nopred", pathto_writesnps = "intermediate_outputs/alleles2flip.txt")
+  print("Finished building allele mismatch list.")
+
+  # Now that the bad alleles have been identified, we can run the loop, flipping them for each subset of respondents and calculating score
+  system(paste0("plink1.9 --bfile ", ukb_file_path, " --reference-allele refallele.txt --make-bed --out intermediate_outputs/refallele_df"))
+  system("plink1.9 --bfile  intermediate_outputs/refallele_df --flip intermediate_outputs/alleles2flip.txt --make-bed --out intermediate_outputs/score_POSTFLIP")
+  system("plink1.9 --bfile intermediate_outputs/score_POSTFLIP --reference-allele refallele.txt --make-bed --out intermediate_outputs/score_POSTFLIP_POSTALIGN")
+  system(paste0("plink1.9 --bfile intermediate_outputs/score_POSTFLIP_POSTALIGN --score beta.txt --out ", output_path, new_folder_name))
+
+  print(paste0('wrote PGS file to ', output_path, new_folder_name, ".profile"))
+
+}
+
+# Below we run the actual construction
+# first set the working directory (this is where it will store the temporary folder and files)
+setwd("~/vgwas")
+
+# now for the main function:
+# new_folder_name is the temporary folder where results will be saveRDS
+# gwas_file_path is the path to the gwas you are using to construct the PGS
+# ukb_file_path is the path to the cleaned UKB genetic data set you are using
+# snp refers to the name of the column in gwas_file_path which stores information on SNP identifiers (i.e. rs id)
+# refallele is the column in gwas_file_path which stores info on the reference allele
+# effect is the column in gwas_file_path which stores info on the effect of the allele in question on the phenotype
+# finally output path is the folder location where you want the final scores stored
+ukb_macro_PGS(new_folder_name = "height_PGS",
+              ukb_file_path = "~/cleaned_ukb_files/ukb_cleaned",
+              gwas_file_path = "~/vgwas/height_hlmm.profile",
+              snp = "SNP",
+              refallele = "A1",
+              effect = "BETA",
+              output_path = "~/vgwas/scores/")
+
+# Here, we construct the core data set that will be used in later files
+# Load necessary packages and functions
+library(foreign)
+library(readstata13)
+
+make_inv_norm_y=function(y){
+  # function for converting a variable to the inverse normal distribution
+  ecdf_y=ecdf(y)
+  return(qnorm(ecdf_y(y)*(length(y)/(length(y)+1))))
+}
+
+zscore = function(x){
+  # function for z-scoring a variable
+  pop_sd <- sd(x, na.rm = T)*sqrt((sum(!is.na(x))-1)/(sum(!is.na(x))))
+  pop_mean <- mean(x, na.rm = T)
+  z <- (x - pop_mean)/pop_sd
+  z <- z^2
+  return(z)
+}
+
+# set the working directory (this is an example)
+setwd("~/vpgs_files/")
+
+# Load in UKB data
+ukb_pheno = read.dta13("~/ukb_pheno/pheno_Ukbio.dta")
+
+# Limit to Brits only
+brit_ids = na.omit(ukb_pheno$n_eid[ukb_pheno$n_22006_0 == 1 & is.na(ukb_pheno$n_22027_0) & ukb_pheno$n_22021_0_0 != 10 & is.na(ukb_pheno$n_22019_0)])
+ukb_pheno = ukb_pheno[ukb_pheno$n_eid %in% brit_ids,]
+
+# drop duplicate columns before merging with core ukb
+ukb_pheno = ukb_pheno[,which(!grepl("n_22009_0", colnames(ukb_pheno)))]
+
+# identify relateds
+ukb_pheno$related = ifelse(ukb_pheno$n_22021_0_0 < 0, NA, ukb_pheno$n_22021_0_0)
+ukb_pheno$related = ifelse(ukb_pheno$related > 0, 1, 0)
+
+# drop those for whom relatedness could not be identified
+ukb_pheno = subset(ukb_pheno, is.na(ukb_pheno$related) == F)
+
+# Construct outcome variables
+# A. BMI
+ukb_pheno$bmi <- as.numeric(ukb_pheno$n_21001_0_0)
+
+# inverse normal version
+ukb_pheno$inv_norm_bmi  = ukb_pheno$bmi
+ukb_pheno$inv_norm_bmi[ukb_pheno$related == 0] = make_inv_norm_y(ukb_pheno$bmi[ukb_pheno$related == 0])
+ukb_pheno$inv_norm_bmi[ukb_pheno$related == 1] = make_inv_norm_y(ukb_pheno$bmi[ukb_pheno$related == 1])
+
+# z-scored version
+ukb_pheno$z_bmi  = ukb_pheno$bmi
+ukb_pheno$z_bmi[ukb_pheno$related == 0] = zscore(ukb_pheno$bmi[ukb_pheno$related == 0])
+ukb_pheno$z_bmi[ukb_pheno$related == 1] = zscore(ukb_pheno$bmi[ukb_pheno$related == 1])
+
+
+# B. Height
+ukb_pheno$height <- as.numeric(ukb_pheno$n_50_0_0)
+
+# inverse normal version
+ukb_pheno$inv_norm_height  = ukb_pheno$height
+ukb_pheno$inv_norm_height[ukb_pheno$related == 0] = make_inv_norm_y(ukb_pheno$height[ukb_pheno$related == 0])
+ukb_pheno$inv_norm_height[ukb_pheno$related == 1] = make_inv_norm_y(ukb_pheno$height[ukb_pheno$related == 1])
+
+# z-scored version
+ukb_pheno$z_height  = ukb_pheno$height
+ukb_pheno$z_height[ukb_pheno$related == 0] = zscore(ukb_pheno$height[ukb_pheno$related == 0])
+ukb_pheno$z_height[ukb_pheno$related == 1] = zscore(ukb_pheno$height[ukb_pheno$related == 1])
+
+# C. Eduyears
+ukb_pheno$n_6138_0_0_recode = as.numeric(ukb_pheno$n_6138_0_0)
+# following okbay et al., convert from degree attained to years of schooling
+edu_years = rep(NA, length(ukb_pheno$n_6138_0_0_recode))
+edu_years = ifelse(ukb_pheno$n_6138_0_0_recode == 1, 20, edu_years)
+edu_years = ifelse(ukb_pheno$n_6138_0_0_recode == 2, 13, edu_years)
+edu_years = ifelse(ukb_pheno$n_6138_0_0_recode == 3, 10, edu_years)
+edu_years = ifelse(ukb_pheno$n_6138_0_0_recode == 4, 10, edu_years)
+edu_years = ifelse(ukb_pheno$n_6138_0_0_recode == -7, 7, edu_years)
+ukb_pheno$education = edu_years
+
+# inverse normal
+ukb_pheno$inv_norm_education = ukb_pheno$education
+ukb_pheno$inv_norm_education[ukb_pheno$related == 0] = make_inv_norm_y(ukb_pheno$inv_norm_education[ukb_pheno$related == 0])
+ukb_pheno$inv_norm_education[ukb_pheno$related == 1] = make_inv_norm_y(ukb_pheno$inv_norm_education[ukb_pheno$related == 1])
+
+# z-score
+ukb_pheno$z_education  = ukb_pheno$education
+ukb_pheno$z_education[ukb_pheno$related == 0] = zscore(ukb_pheno$education[ukb_pheno$related == 0])
+ukb_pheno$z_education[ukb_pheno$related == 1] = zscore(ukb_pheno$education[ukb_pheno$related == 1])
+
+# D. Number of children ever born
+# for men
+ukb_pheno$n_2405_0_0_recode = as.numeric(ukb_pheno$n_2405_0_0)
+ukb_pheno$n_2405_0_0_recode = ifelse(ukb_pheno$n_2405_0_0_recode < 0, NA, ukb_pheno$n_2405_0_0_recode)
+# for women
+ukb_pheno$n_2734_0_0_recode = as.numeric(ukb_pheno$n_2734_0_0)
+ukb_pheno$n_2734_0_0_recode = ifelse(ukb_pheno$n_2734_0_0_recode < 0, NA, ukb_pheno$n_2734_0_0_recode)
+# put together
+ukb_pheno$num_children = ifelse(is.na(ukb_pheno$n_2405_0_0_recode), ukb_pheno$n_2734_0_0_recode, ukb_pheno$n_2405_0_0_recode)
+# drop absurd values
+ukb_pheno$num_children = ifelse(ukb_pheno$num_children > 15, NA, ukb_pheno$num_children)
+
+# inverse normal
+ukb_pheno$inv_norm_num_children = ukb_pheno$num_children
+ukb_pheno$inv_norm_num_children[ukb_pheno$related == 0] = make_inv_norm_y(ukb_pheno$inv_norm_num_children[ukb_pheno$related == 0])
+ukb_pheno$inv_norm_num_children[ukb_pheno$related == 1] = make_inv_norm_y(ukb_pheno$inv_norm_num_children[ukb_pheno$related == 1])
+
+# z-score
+ukb_pheno$z_num_children  = ukb_pheno$num_children
+ukb_pheno$z_num_children[ukb_pheno$related == 0] = zscore(ukb_pheno$num_children[ukb_pheno$related == 0])
+ukb_pheno$z_num_children[ukb_pheno$related == 1] = zscore(ukb_pheno$num_children[ukb_pheno$related == 1])
+
+# Construct control variables
+ukb_pheno$sex <- as.numeric(ukb_pheno$n_31_0_0.x)
+ukb_pheno$age <- as.numeric(ukb_pheno$n_21003_0_0.x)
+ukb_pheno$array <- ifelse(as.numeric(ukb_pheno$n_22000_0_0.x) > 0, 1, 0)
+
+# change names for PC variables to be more readily identifiable
+colnames(ukb_pheno)[grepl("n_22009_0_", colnames(ukb_pheno))] = paste0("PC", 1:40)
+
+ukb_pheno$FID = ukb_pheno$n_eid
+ukb_pheno$IID = ukb_pheno$n_eid
+
+# set seed for reproducability
+set.seed(1953) # year double helix was discovered
+
+# construct training (80%) and test sets (20%)
+## sample ids
+test_set = sample(1:nrow(ukb_pheno), round(nrow(ukb_pheno) * 0.2))
+training_set = c(1:nrow(ukb_pheno))[!c(1:nrow(ukb_pheno)) %in% test_set]
+## subset data
+ukb_pheno_test = ukb_pheno[test_set,]
+ukb_pheno_training = ukb_pheno[training_set,]
+
+# save training and test sets
+saveRDS(ukb_pheno_test, "~/vgwas/ukb_pheno_test.RDS")
+saveRDS(ukb_pheno_training, "~/vgwas/ukb_pheno_training.RDS")
+
+## Visualizing the vPGS
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(data.table)
+library(haven)
+library(readstata13)
+library(scales)
+library(stargazer)
+library(stringr)
+library(plm)
+library(lmtest)
+library(MASS)
+library(broom)
+library(xtable)
+library(purrr)
+
+theme_new <- function(base_size = 24, base_family = "Helvetica"){
+  theme_bw(base_size = base_size, base_family = base_family) %+replace%
+    theme(
+      panel.grid = element_blank(),
+      panel.border = element_rect(fill = NA, colour = "white", size=1),
+      panel.background = element_rect(fill = "white", colour = "black"),
+      strip.background = element_rect(fill = NA),
+      axis.text.x = element_text(color = "black"),
+      axis.text.y = element_text(color = "black")
+    )
+}
+
+
+create_df_predictgraph <- function(original_df,
+                name_e,
+                value_e,
+                name_value_e,
+                name_score,
+                range_score,
+                model_obj,
+                return_prob = FALSE){
+
+    data_predictat = original_df %>%
+          mutate_if(is.numeric, funs(mean(., na.rm = TRUE)))
+
+    data_predictat['female'] = 1
+    data_predictat[name_score] = range_score
+    data_predictat[name_e] = value_e
+
+    data_predictat_final = data_predictat %>%
+              distinct()
+
+    predict_values = predict(model_obj,
+              newdata = data_predictat_final,
+              se.fit = TRUE)
+
+    if(return_prob == TRUE){
+
+      predict_values = predict(model_obj,
+              newdata = data_predictat_final,
+              se.fit = TRUE, type = 'response')
+
+    }
+
+    predict_forgraph = data.frame(predict_values$fit,
+                  predict_values$se.fit)
+
+    colnames(predict_forgraph) = c('predict', 'se')
+
+    predict_forgraph_final = predict_forgraph %>%
+              mutate(lower = predict - 1.96*se,
+                upper = predict + 1.96*se,
+                e_at = name_value_e,
+                score_range = range_score)
+
+
+    return(predict_forgraph_final)
+
+}
+
+
+interact_regs <- function(data,
+            e_name,
+            m_pgs_name,
+            v_pgs_name,
+            outcome_name,
+            all_controls,
+            type_reg,
+            index_var = ''){
+
+
+  vars_to_subset = c(e_name, m_pgs_name,
+          outcome_name,
+          all_controls)
+
+  subset_df = data[, vars_to_subset] %>%
+      distinct()
+
+  ## create formulas
+  mPGS_main_formula = formula(sprintf("%s ~ %s + %s + %s",
+        outcome_name,
+        e_name,
+        m_pgs_name,
+        paste(all_controls, collapse = "+")))
+
+  mPGS_interact_formula = formula(sprintf("%s ~ %s*%s + %s",
+        outcome_name,
+        e_name,
+        m_pgs_name,
+        paste(all_controls, collapse = "+")))
+
+  vPGS_main_formula = formula(sprintf("%s ~ %s + %s + %s",
+        outcome_name,
+        e_name,
+        v_pgs_name,
+        paste(all_controls, collapse = "+")))
+
+  vPGS_interact_formula = formula(sprintf("%s ~ %s*%s + %s",
+        outcome_name,
+        e_name,
+        v_pgs_name,
+        paste(all_controls, collapse = "+")))
+
+
+  ## run regressions
+  if(type_reg == 'linear'){
+
+      mPGS_main_reg = lm(mPGS_main_formula,
+           data = data)
+
+      mPGS_interact_reg = lm(mPGS_interact_formula,
+           data = data)
+
+      vPGS_main_reg = lm(vPGS_main_formula,
+           data = data)
+
+    vPGS_interact_reg = lm(vPGS_interact_formula,
+           data = data)
+
+    return(list(mPGS_main_reg,
+      mPGS_interact_reg,
+      vPGS_main_reg,
+      vPGS_interact_reg))
+
+
+
+    } else if (type_reg == 'logit'){
+
+
+    mPGS_main_reg = glm(mPGS_main_formula,
+           data = data, family = 'binomial')
+
+    mPGS_interact_reg = glm(mPGS_interact_formula,
+           data = data, family = 'binomial')
+
+    vPGS_main_reg = glm(vPGS_main_formula,
+           data = data, family = 'binomial')
+
+    vPGS_interact_reg = glm(vPGS_interact_formula,
+           data = data, family = 'binomial')
+
+    return(list(mPGS_main_reg,
+      mPGS_interact_reg,
+      vPGS_main_reg,
+      vPGS_interact_reg))
+
+
+  } else if (type_reg == 'panel'){
+
+    mPGS_main_reg_init = plm(mPGS_main_formula,
+           data = data, index = index_var,
+                  model = 'pooling')
+
+    mPGS_main_reg = coeftest(mPGS_main_reg_init, vcov=vcovHC(mPGS_main_reg_init,
+                                      type="HC0",cluster="group"))
+
+    mPGS_interact_reg_init = plm(mPGS_interact_formula,
+           data = data, index = index_var,
+                  model = 'pooling')
+
+    mPGS_interact_reg = coeftest(mPGS_interact_reg_init, vcov=vcovHC(mPGS_interact_reg_init,
+                                      type="HC0",cluster="group"))
+
+    vPGS_main_reg_init = plm(vPGS_main_formula,
+           data = data, index = index_var,
+                  model = 'pooling')
+
+    vPGS_main_reg = coeftest(vPGS_main_reg_init, vcov=vcovHC(vPGS_main_reg_init,
+                                      type="HC0",cluster="group"))
+
+    vPGS_interact_reg_init = plm(vPGS_interact_formula,
+           data = data, index = index_var,
+                  model = 'pooling')
+
+    vPGS_interact_reg = coeftest(vPGS_interact_reg_init, vcov=vcovHC(vPGS_interact_reg_init,
+                                      type="HC0",cluster="group"))
+
+    return(list(mPGS_main_reg,
+      mPGS_interact_reg,
+      vPGS_main_reg,
+      vPGS_interact_reg))
+
+
+  }
+}
+
+# set working directory
+setwd("~/vgwas/scores/")
+
+# read in test data
+ukb_pheno = readRDS("~/vgwas/ukb_pheno_test.RDS")
+
+# 2. Load the different scores
+# load in vpgs
+f <- function(x, newname = "var"){
+  colnames(x)[length(x)] = newname
+  return(x)
+}
+
+# read vpgs
+all_vpgs = list.files("~/vgwas/scores/")
+all_vpgs = subset(all_vpgs, grepl("_resid.txt", all_vpgs)|
+                    grepl("_gwas_final", all_vpgs)|
+                    grepl("vqtl_final_with_alleles", all_vpgs)|
+                    grepl("hlmm.txt", all_vpgs)
+)
+
+all_vpgs <- c(all_vpgs, vqtl_files)
+
+all_vpgs_tabs = lapply(all_vpgs, function(x) read.table(x, stringsAsFactors = F, header = T))
+
+pgs_names <- gsub("~/vgwas/scores/", "", all_vpgs)
+pgs_names = unlist(lapply(strsplit(pgs_names, "\\."), function(x) x[1]))
+all_vpgs_tabs_corrected = lapply(all_vpgs_tabs, function(x) x[,c("IID", "SCORE")])
+all_vpgs_tabs_corrected = lapply(1:length(all_vpgs_tabs_corrected), function(x) f(all_vpgs_tabs_corrected[[x]], newname = pgs_names[x]))
+
+all_vpgs_tabs_corrected_df = all_vpgs_tabs_corrected %>% reduce(., merge)
+
+# merge in vpgs
+start_col <- 2
+last_col <- ncol(all_vpgs_tabs_corrected_df)
+
+ids1 = rep("m", length(colnames(all_vpgs_tabs_corrected_df)[start_col:last_col]))
+ids1 = ifelse(grepl("hlmm", colnames(all_vpgs_tabs_corrected_df)[start_col:last_col]), "hlmm", ids1)
+ids1 = ifelse(grepl("vqtl", colnames(all_vpgs_tabs_corrected_df)[start_col:last_col]), "lev", ids1)
+ids1 = ifelse(grepl("sib", colnames(all_vpgs_tabs_corrected_df)[start_col:last_col]), "sib", ids1)
+ids1 = ifelse(grepl("z_", colnames(all_vpgs_tabs_corrected_df)[start_col:last_col]), "z", ids1)
+
+ids2 = rep("bmi", length(colnames(all_vpgs_tabs_corrected_df)[start_col:last_col]))
+ids2 = ifelse(grepl("height", colnames(all_vpgs_tabs_corrected_df)[start_col:last_col]), "height", ids2)
+ids2 = ifelse(grepl("education", colnames(all_vpgs_tabs_corrected_df)[start_col:last_col]), "edu", ids2)
+ids2 = ifelse(grepl("num_child", colnames(all_vpgs_tabs_corrected_df)[start_col:last_col]), "numc", ids2)
+
+ids3 = rep("_diffN", length(colnames(all_vpgs_tabs_corrected_df)[start_col:last_col]))
+ids3 = ifelse(grepl("sib", colnames(all_vpgs_tabs_corrected_df)[start_col:last_col]), "", ids3)
+
+ids <- paste(ids1, ids2, sep = "_")
+ids <- paste(ids, ids3, sep = "")
+
+colnames(all_vpgs_tabs_corrected_df)[start_col:last_col] = ids
+pgs_names_2 = colnames(all_vpgs_tabs_corrected_df)[start_col:last_col]
+
+ukb_pheno = merge(ukb_pheno, all_vpgs_tabs_corrected_df, by = "IID")
+colnames(ukb_pheno)[colnames(ukb_pheno) == "z_bmi.y"] = "z_bmi"
+colnames(ukb_pheno)[colnames(ukb_pheno) == "z_height.y"] = "z_height"
+colnames(ukb_pheno)[colnames(ukb_pheno) == "z_bmi.x"] = "zscored_bmi"
+colnames(ukb_pheno)[colnames(ukb_pheno) == "z_height.x"] = "zscored_height"
+
+# fix the hlmm ones
+ukb_pheno$hlmm_bmi_diffN = ukb_pheno$hlmm_bmi_diffN * -1
+ukb_pheno$hlmm_height_diffN = ukb_pheno$hlmm_height_diffN * -1
+ukb_pheno$hlmm_edu_diffN = ukb_pheno$hlmm_edu_diffN * -1
+ukb_pheno$hlmm_numc_diffN = ukb_pheno$hlmm_numc_diffN * -1
+
+# covars
+ukb_pheno$gender = ifelse(ukb_pheno$n_31_0_0.x == "Male", 1, 2)
+ukb_pheno$yob = ukb_pheno$n_34_0_0.x
+ukb_pheno$educ_depriv = ukb_pheno$n_26414_0_0
+
+# Bmi
+ukb_pheno$bmi <- as.numeric(ukb_pheno$n_21001_0_0)
+# Height
+ukb_pheno$height <- as.numeric(ukb_pheno$n_50_0_0)
+# Education
+ukb_pheno$n_6138_0_0_recode = as.numeric(ukb_pheno$n_6138_0_0)
+
+new_val = rep(NA, length(ukb_pheno$n_6138_0_0_recode))
+new_val = ifelse(ukb_pheno$n_6138_0_0_recode == 1, 20, new_val)
+new_val = ifelse(ukb_pheno$n_6138_0_0_recode == 2, 13, new_val)
+new_val = ifelse(ukb_pheno$n_6138_0_0_recode == 3, 10, new_val)
+new_val = ifelse(ukb_pheno$n_6138_0_0_recode == 4, 10, new_val)
+new_val = ifelse(ukb_pheno$n_6138_0_0_recode == -7, 7, new_val)
+
+ukb_pheno$education = new_val
+
+# D. Number of children ever born
+ukb_pheno$n_2405_0_0_recode = as.numeric(ukb_pheno$n_2405_0_0)
+ukb_pheno$n_2405_0_0_recode = ifelse(ukb_pheno$n_2405_0_0_recode < 0, NA, ukb_pheno$n_2405_0_0_recode)
+ukb_pheno$n_2734_0_0_recode = as.numeric(ukb_pheno$n_2734_0_0)
+ukb_pheno$n_2734_0_0_recode = ifelse(ukb_pheno$n_2734_0_0_recode < 0, NA, ukb_pheno$n_2734_0_0_recode)
+ukb_pheno$num_children = ifelse(is.na(ukb_pheno$n_2405_0_0_recode), ukb_pheno$n_2734_0_0_recode, ukb_pheno$n_2405_0_0_recode)
+ukb_pheno$num_children = ifelse(ukb_pheno$num_children > 15, NA, ukb_pheno$num_children)
+
+# scale pgs
+scaled_vpgs = sapply(ukb_pheno[,pgs_names_2], scale)
+colnames(scaled_vpgs) = paste0(colnames(scaled_vpgs), "_scaled")
+
+ukb_pheno = cbind(ukb_pheno, scaled_vpgs)
+
+# scaled phenotypes
+ukb_pheno$bmi_scaled = scale(ukb_pheno$bmi)
+ukb_pheno$height_scaled = scale(ukb_pheno$height)
+ukb_pheno$education_scaled = scale(ukb_pheno$education)
+ukb_pheno$num_children_scaled = scale(ukb_pheno$num_children)
+
+# finally scale PCs
+ukb_pheno[,grepl("PC", colnames(ukb_pheno))] = sapply(ukb_pheno[,grepl("PC", colnames(ukb_pheno))], scale)
+
+saveRDS(ukb_pheno, "data_for_vPGS.RDS")
+
+
+# 2. Descriptive relationship with levels
+
+## 2.1  BMI
+scores_BMI = c(grep("*bmi_*diffN_scaled", colnames(ukb_pheno), value = TRUE), "sib_bmi_scaled")
+scores_BMI_diffN = c(grep("*bmi_*diffN_scaled", colnames(ukb_pheno), value = TRUE), "sib_bmi_scaled")
+
+hrs_vPGScols = ukb_pheno[, c("IID", scores_BMI_diffN)] %>%
+            reshape2::melt(, id.vars = c("IID", "m_bmi_diffN_scaled"))
+
+
+library(RColorBrewer)
+
+# Put all the color values (in hex format) from Dark2 into a vector
+dark4 <- brewer.pal(4,"Dark2")
+dark4
+
+vPGS_color_map = c("Squared Z" = dark4[1], "HLMM dispersion" = dark4[2],
+                   "Sibling SD" = "cyan", "Levene's" = dark4[3],
+                   "Levels" = dark4[4])
+
+ggplot(hrs_vPGScols, aes(x = m_bmi_diffN_scaled,
+                            y = value,
+                         color = factor(variable,
+                    levels = c("z_bmi_diffN_scaled",
+                    "hlmm_bmi_diffN_scaled",
+                    "sib_bmi_scaled",
+                    "lev_bmi_diffN_scaled"),
+                    labels = c("Squared Z",
+                               "HLMM dispersion",
+                               "Sibling SD",
+                               "Levene's")))) +
+  geom_point(alpha = 0.1) +
+  geom_smooth() +
+  theme_new() +
+  labs(color = "vPGS") +
+  ylab('vPGS for BMI\n(estimated UKB EA)') +
+  xlab('mPGS for BMI\n(estimated UKB EA)') +
+  scale_color_manual(values = vPGS_color_map) +
+  theme(legend.position = c(0.3, 0.8),
+        legend.background = element_blank())
+
+
+ggsave('~/vgwas/figures/vPGS_comparison_BMI_nmatch.pdf',
+       plot = last_plot(),
+       device = "pdf",
+       height = 8,
+       width = 12)
+
+
+### Height
+scores_height = c(grep("*height_*diffN_scaled", colnames(ukb_pheno), value = TRUE), "sib_height_scaled")
+scores_height_diffN = c(grep("*height_*diffN_scaled", colnames(ukb_pheno), value = TRUE), "sib_height_scaled")
+
+hrs_vPGScols = ukb_pheno[, c("IID", scores_height)] %>%
+  reshape2::melt(, id.vars = c("IID", "m_height_diffN_scaled"))
+
+
+library(RColorBrewer)
+
+# Put all the color values (in hex format) from Dark2 into a vector
+dark4 <- brewer.pal(4,"Dark2")
+dark4
+
+vPGS_color_map = c("Squared Z" = dark4[1], "HLMM dispersion" = dark4[2],
+                   "Sibling SD" = "cyan", "Levene's" = dark4[3],
+                   "Levels" = dark4[4])
+
+ggplot(hrs_vPGScols, aes(x = m_height_diffN_scaled,
+                         y = value,
+                         color = factor(variable,
+                                        levels = c("z_height_diffN_scaled",
+                                                   "hlmm_height_diffN_scaled",
+                                                   "sib_height_scaled",
+                                                   "lev_height_diffN_scaled"),
+                                        labels = c("Squared Z",
+                                                   "HLMM dispersion",
+                                                   "Sibling SD",
+                                                   "Levene's")))) +
+  geom_point(alpha = 0.1) +
+  geom_smooth() +
+  theme_new() +
+  labs(color = "vPGS") +
+  ylab('vPGS for height\n(estimated UKB EA)') +
+  xlab('mPGS for height\n(estimated UKB EA)') +
+  scale_color_manual(values = vPGS_color_map) +
+  theme(legend.position = c(0.3, 0.8),
+        legend.background = element_blank())
+
+
+ggsave('~/vgwas/figures/vPGS_comparison_height_nmatch.pdf',
+       plot = last_plot(),
+       device = "pdf",
+       height = 8,
+       width = 12)
+
+
+### Education
+scores_education = c(grep("*edu_*diffN_scaled", colnames(ukb_pheno), value = TRUE), "sib_edu_scaled")
+scores_education_diffN = c(grep("*edu_*diffN_scaled", colnames(ukb_pheno), value = TRUE), "sib_edu_scaled")
+
+hrs_vPGScols = ukb_pheno[, c("IID", scores_education)] %>%
+  reshape2::melt(, id.vars = c("IID", "m_edu_diffN_scaled"))
+
+
+library(RColorBrewer)
+
+# Put all the color values (in hex format) from Dark2 into a vector
+dark4 <- brewer.pal(4,"Dark2")
+dark4
+
+vPGS_color_map = c("Squared Z" = dark4[1], "HLMM dispersion" = dark4[2],
+                   "Sibling SD" = "cyan", "Levene's" = dark4[3],
+                   "Levels" = dark4[4])
+
+ggplot(hrs_vPGScols, aes(x = m_edu_diffN_scaled,
+                         y = value,
+                         color = factor(variable,
+                                        levels = c("z_edu_diffN_scaled",
+                                                   "hlmm_edu_diffN_scaled",
+                                                   "sib_edu_scaled",
+                                                   "lev_edu_diffN_scaled"),
+                                        labels = c("Squared Z",
+                                                   "HLMM dispersion",
+                                                   "Sibling SD",
+                                                   "Levene's")))) +
+  geom_point(alpha = 0.1) +
+  geom_smooth() +
+  theme_new() +
+  labs(color = "vPGS") +
+  ylab('vPGS for education\n(estimated UKB EA)') +
+  xlab('mPGS for education\n(estimated UKB EA)') +
+  scale_color_manual(values = vPGS_color_map) +
+  theme(legend.position = c(0.3, 0.8),
+        legend.background = element_blank())
+
+
+ggsave('~/vgwas/figures/vPGS_comparison_education_nmatch.pdf',
+       plot = last_plot(),
+       device = "pdf",
+       height = 8,
+       width = 12)
+
+### Number ever born
+
+scores_numc = c(grep("*numc_*diffN_scaled", colnames(ukb_pheno), value = TRUE), "sib_numc_scaled")
+scores_numc_diffN = c(grep("*numc_*diffN_scaled", colnames(ukb_pheno), value = TRUE), "sib_numc_scaled")
+
+hrs_vPGScols = ukb_pheno[, c("IID", scores_numc)] %>%
+  reshape2::melt(, id.vars = c("IID", "m_numc_diffN_scaled"))
+
+
+library(RColorBrewer)
+
+# Put all the color values (in hex format) from Dark2 into a vector
+dark4 <- brewer.pal(4,"Dark2")
+dark4
+
+vPGS_color_map = c("Squared Z" = dark4[1], "HLMM dispersion" = dark4[2],
+                   "Sibling SD" = "cyan", "Levene's" = dark4[3],
+                   "Levels" = dark4[4])
+
+ggplot(hrs_vPGScols, aes(x = m_numc_diffN_scaled,
+                         y = value,
+                         color = factor(variable,
+                                        levels = c("z_numc_diffN_scaled",
+                                                   "hlmm_numc_diffN_scaled",
+                                                   "sib_numc_scaled",
+                                                   "lev_numc_diffN_scaled"),
+                                        labels = c("Squared Z",
+                                                   "HLMM dispersion",
+                                                   "Sibling SD",
+                                                   "Levene's")))) +
+  geom_point(alpha = 0.1) +
+  geom_smooth() +
+  theme_new() +
+  labs(color = "vPGS") +
+  ylab('vPGS for number of children ever born\n(estimated UKB EA)') +
+  xlab('mPGS for number of children ever born\n(estimated UKB EA)') +
+  scale_color_manual(values = vPGS_color_map) +
+  theme(legend.position = c(0.3, 0.8),
+        legend.background = element_blank())
+
+
+ggsave('~/vgwas/figures/vPGS_comparison_numc_nmatch.pdf',
+       plot = last_plot(),
+       device = "pdf",
+       height = 8,
+       width = 12)
+
+# BMI
+main_reg <- function(data,
+            all_PGS_names,
+            outcome_name,
+            all_controls){
+
+  all_results = vector("list", length(all_PGS_names))
+  j = 1
+  for(i in 1:length(all_PGS_names)){
+
+    one_pgs_name = all_PGS_names[i]
+
+    formula_main = formula(sprintf("%s ~ %s + %s",
+        outcome_name,
+        one_pgs_name,
+        paste(all_controls, collapse = "+")))
+
+    main_results = lm(formula_main,
+           data = data)
+    all_results[[j]] = main_results
+    j  = j+1
+
+  }
+    return(all_results)
+}
+
+all_regs_BMI_main_matchN = main_reg(data = ukb_pheno,
+                all_PGS_names = scores_BMI,
+                outcome_name = "bmi_scaled",
+                all_controls = c("PC1", "PC2", "PC3", "PC4", "PC5"))
+
+all_main_effects_matchN = lapply(all_regs_BMI_main_matchN,
+                function(x) summary(x)$coefficients)
+
+all_main_effects_matchN
+
+treatment_coef_matchN = do.call(rbind.data.frame,
+                         lapply(all_main_effects_matchN,
+                    function(x)
+                    x[2, ]))
+
+colnames(treatment_coef_matchN) = c("beta",
+                             "se",
+                             "t",
+                             "p")
+
+treatment_coef_matchN = treatment_coef_matchN %>%
+            mutate(score= scores_BMI) %>%
+            mutate(lower = beta - 1.96*se,
+                   upper = beta + 1.96*se)
+
+## repeat for non-matched N
+all_regs_BMI_main_diffN = main_reg(data = ukb_pheno,
+                all_PGS_names = scores_BMI_diffN,
+                outcome_name = "bmi_scaled",
+                all_controls = c("PC1", "PC2", "PC3", "PC4", "PC5"))
+
+all_main_effects_diffN = lapply(all_regs_BMI_main_diffN,
+                function(x) summary(x)$coefficients)
+
+
+treatment_coef_diffN = do.call(rbind.data.frame,
+                         lapply(all_main_effects_diffN,
+                    function(x)
+                    x[2, ]))
+
+colnames(treatment_coef_diffN) = c("beta",
+                             "se",
+                             "t",
+                             "p")
+
+treatment_coef_diffN = treatment_coef_diffN %>%
+            mutate(score= scores_BMI_diffN) %>%
+            mutate(lower = beta - 1.96*se,
+                   upper = beta + 1.96*se)
+
+
+## save and assign
+tx_bmi = rbind.data.frame(treatment_coef_matchN,
+                          treatment_coef_diffN) %>%
+        mutate(type = ifelse(grepl("matchN", score), "Matched N",
+                             "Different N"),
+               score_combined =
+              case_when(grepl("hlmm|HLMM", score) ~ "HLMM dispersion",
+                    grepl("m_", score) ~ "Levels",
+                    grepl("sib", score) ~ "Sibling SD",
+                    grepl("lev", score) ~ "Levene's",
+                    grepl("z_", score) ~ "Squared Z")) %>%
+          filter(!is.na(score_combined))
+tx_bmi <- tx_bmi[1:9,]
+
+print(xtable(tx_bmi %>% dplyr::select(score_combined, type,
+                                beta, se, t, p)),
+      include.rownames = FALSE)
+
+
+
+
+ggplot(tx_bmi, aes(x = score_combined,
+            y = beta,
+            color = score_combined,
+            linetype = type)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = lower, ymax = upper),
+                width = 0.3) +
+  theme_new() +
+  labs(color = "") +
+  scale_color_manual(values = vPGS_color_map) +
+  ylim(-0.05, 0.25) +
+  coord_flip() +
+  xlab("Score") +
+  ylab("Treatment coefficient and 95% CI\n(reg predicting BMI;\ncontrol for first 5 PCs)") +
+  theme(legend.position = c(0.7, 0.8),
+        legend.background = element_blank()) +
+  geom_hline(yintercept = 0,
+             linetype = "dashed",
+             color = "red") +
+  guides(linetype = FALSE)
+
+ggsave('~/vgwas/figures/treatment_coef_levels_bmi_compare.pdf',
+       plot = last_plot(),
+       device = "pdf",
+       height = 8,
+       width = 12)
+
+### Education
+all_regs_educ_main_matchN = main_reg(data = ukb_pheno,
+                all_PGS_names = scores_education,
+                outcome_name = "education_scaled",
+                all_controls = c("PC1", "PC2", "PC3", "PC4", "PC5"))
+
+all_main_effects_matchN = lapply(all_regs_educ_main_matchN,
+                function(x) summary(x)$coefficients)
+
+all_main_effects_matchN
+
+treatment_coef_matchN = do.call(rbind.data.frame,
+                         lapply(all_main_effects_matchN,
+                    function(x)
+                    x[2, ]))
+
+colnames(treatment_coef_matchN) = c("beta",
+                             "se",
+                             "t",
+                             "p")
+
+treatment_coef_matchN = treatment_coef_matchN %>%
+            mutate(score= scores_education) %>%
+            mutate(lower = beta - 1.96*se,
+                   upper = beta + 1.96*se)
+
+## repeat for non-matched N
+all_regs_educ_main_diffN = main_reg(data = ukb_pheno,
+                all_PGS_names = scores_education_diffN,
+                outcome_name = "education_scaled",
+                all_controls = c("PC1", "PC2", "PC3", "PC4", "PC5"))
+
+all_main_effects_diffN = lapply(all_regs_educ_main_diffN,
+                function(x) summary(x)$coefficients)
+
+
+treatment_coef_diffN = do.call(rbind.data.frame,
+                         lapply(all_main_effects_diffN,
+                    function(x)
+                    x[2, ]))
+
+colnames(treatment_coef_diffN) = c("beta",
+                             "se",
+                             "t",
+                             "p")
+
+treatment_coef_diffN = treatment_coef_diffN %>%
+            mutate(score= scores_education_diffN) %>%
+            mutate(lower = beta - 1.96*se,
+                   upper = beta + 1.96*se)
+
+
+
+tx_educ = rbind.data.frame(treatment_coef_matchN,
+                          treatment_coef_diffN) %>%
+        mutate(type = ifelse(grepl("matchN", score), "Matched N",
+                             "Different N"),
+               score_combined =
+              case_when(grepl("hlmm|HLMM", score) ~ "HLMM dispersion",
+                    grepl("m_", score) ~ "Levels",
+                    grepl("sib", score) ~ "Sibling SD",
+                    grepl("lev", score) ~ "Levene's",
+                    grepl("z_", score) ~ "Squared Z")) %>%
+          filter(!is.na(score_combined))
+tx_educ <- tx_educ[1:9,]
+
+print(xtable(tx_educ %>% dplyr::select(score_combined, type,
+                                beta, se, t, p)),
+      include.rownames = FALSE)
+
+
+
+
+ggplot(tx_educ, aes(x = score_combined,
+            y = beta,
+            color = score_combined,
+            linetype = type)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = lower, ymax = upper),
+                width = 0.3) +
+  theme_new() +
+  labs(color = "") +
+  scale_color_manual(values = vPGS_color_map) +
+  ylim(-0.25, 0.25) +
+  coord_flip() +
+  xlab("Score") +
+  ylab("Treatment coefficient and 95% CI\n(reg predicting Education;\ncontrol for first 5 PCs)") +
+  theme(legend.position = c(0.3, 0.5),
+        legend.background = element_blank()) +
+  geom_hline(yintercept = 0,
+             linetype = "dashed",
+             color = "red") +
+  guides(linetype = FALSE)
+
+ggsave('~/vgwas/figures/treatment_coef_levels_educ_compare.pdf',
+       plot = last_plot(),
+       device = "pdf",
+       height = 8,
+       width = 12)
+
+### Height
+all_regs_height_main_matchN = main_reg(data = ukb_pheno,
+                all_PGS_names = scores_height,
+                outcome_name = "height_scaled",
+                all_controls = c("PC1", "PC2", "PC3", "PC4", "PC5"))
+
+all_main_effects_matchN = lapply(all_regs_height_main_matchN,
+                function(x) summary(x)$coefficients)
+
+all_main_effects_matchN
+
+treatment_coef_matchN = do.call(rbind.data.frame,
+                         lapply(all_main_effects_matchN,
+                    function(x)
+                    x[2, ]))
+
+colnames(treatment_coef_matchN) = c("beta",
+                             "se",
+                             "t",
+                             "p")
+
+treatment_coef_matchN = treatment_coef_matchN %>%
+            mutate(score= scores_height) %>%
+            mutate(lower = beta - 1.96*se,
+                   upper = beta + 1.96*se)
+
+## repeat for non-matched N
+all_regs_height_main_diffN = main_reg(data = ukb_pheno,
+                all_PGS_names = scores_height_diffN,
+                outcome_name = "height_scaled",
+                all_controls = c("PC1", "PC2", "PC3", "PC4", "PC5"))
+
+all_main_effects_diffN = lapply(all_regs_height_main_diffN,
+                function(x) summary(x)$coefficients)
+
+
+treatment_coef_diffN = do.call(rbind.data.frame,
+                         lapply(all_main_effects_diffN,
+                    function(x)
+                    x[2, ]))
+
+colnames(treatment_coef_diffN) = c("beta",
+                             "se",
+                             "t",
+                             "p")
+
+treatment_coef_diffN = treatment_coef_diffN %>%
+            mutate(score= scores_height_diffN) %>%
+            mutate(lower = beta - 1.96*se,
+                   upper = beta + 1.96*se)
+
+
+
+tx_height = rbind.data.frame(treatment_coef_matchN,
+                          treatment_coef_diffN) %>%
+        mutate(type = ifelse(grepl("matchN", score), "Matched N",
+                             "Different N"),
+               score_combined =
+              case_when(grepl("hlmm|HLMM", score) ~ "HLMM dispersion",
+                    grepl("m_", score) ~ "Levels",
+                    grepl("sib", score) ~ "Sibling SD",
+                    grepl("lev", score) ~ "Levene's",
+                    grepl("z_", score) ~ "Squared Z")) %>%
+          filter(!is.na(score_combined))
+tx_height <- tx_height[1:9,]
+
+print(xtable(tx_height %>% dplyr::select(score_combined, type,
+                                beta, se, t, p)),
+      include.rownames = FALSE)
+
+
+
+
+ggplot(tx_height, aes(x = score_combined,
+            y = beta,
+            color = score_combined,
+            linetype = type)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = lower, ymax = upper),
+                width = 0.3) +
+  theme_new() +
+  labs(color = "") +
+  scale_color_manual(values = vPGS_color_map) +
+  ylim(-0.2, 0.25) +
+  coord_flip() +
+  xlab("Score") +
+  ylab("Treatment coefficient and 95% CI\n(reg predicting Height;\ncontrol for first 5 PCs)") +
+  theme(legend.position = c(0.3, 0.5),
+        legend.background = element_blank()) +
+  geom_hline(yintercept = 0,
+             linetype = "dashed",
+             color = "red") +
+  guides(linetype = FALSE)
+
+ggsave('~/vgwas/figures/treatment_coef_levels_height_compare.pdf',
+       plot = last_plot(),
+       device = "pdf",
+       height = 8,
+       width = 12)
+
+
+
+## NEB
+all_regs_numc_main_matchN = main_reg(data = ukb_pheno,
+                                       all_PGS_names = scores_numc,
+                                       outcome_name = "num_children_scaled",
+                                       all_controls = c("PC1", "PC2", "PC3", "PC4", "PC5"))
+
+all_main_effects_matchN = lapply(all_regs_numc_main_matchN,
+                                 function(x) summary(x)$coefficients)
+
+all_main_effects_matchN
+
+treatment_coef_matchN = do.call(rbind.data.frame,
+                                lapply(all_main_effects_matchN,
+                                       function(x)
+                                         x[2, ]))
+
+colnames(treatment_coef_matchN) = c("beta",
+                                    "se",
+                                    "t",
+                                    "p")
+
+treatment_coef_matchN = treatment_coef_matchN %>%
+  mutate(score= scores_numc) %>%
+  mutate(lower = beta - 1.96*se,
+         upper = beta + 1.96*se)
+
+## repeat for non-matched N
+all_regs_numc_main_diffN = main_reg(data = ukb_pheno,
+                                      all_PGS_names = scores_numc_diffN,
+                                      outcome_name = "num_children_scaled",
+                                      all_controls = c("PC1", "PC2", "PC3", "PC4", "PC5"))
+
+all_main_effects_diffN = lapply(all_regs_numc_main_diffN,
+                                function(x) summary(x)$coefficients)
+
+
+treatment_coef_diffN = do.call(rbind.data.frame,
+                               lapply(all_main_effects_diffN,
+                                      function(x)
+                                        x[2, ]))
+
+colnames(treatment_coef_diffN) = c("beta",
+                                   "se",
+                                   "t",
+                                   "p")
+
+treatment_coef_diffN = treatment_coef_diffN %>%
+  mutate(score= scores_numc_diffN) %>%
+  mutate(lower = beta - 1.96*se,
+         upper = beta + 1.96*se)
+
+
+
+tx_numc = rbind.data.frame(treatment_coef_matchN,
+                             treatment_coef_diffN) %>%
+  mutate(type = ifelse(grepl("matchN", score), "Matched N",
+                       "Different N"),
+         score_combined =
+           case_when(grepl("hlmm|HLMM", score) ~ "HLMM dispersion",
+                    grepl("m_", score) ~ "Levels",
+                    grepl("sib", score) ~ "Sibling SD",
+                    grepl("lev", score) ~ "Levene's",
+                    grepl("z_", score) ~ "Squared Z")) %>%
+  filter(!is.na(score_combined))
+tx_numc <- tx_numc[1:9,]
+
+print(xtable(tx_numc %>% dplyr::select(score_combined, type,
+                                         beta, se, t, p)),
+      include.rownames = FALSE)
+
+
+
+
+ggplot(tx_numc, aes(x = score_combined,
+                      y = beta,
+                      color = score_combined,
+                      linetype = type)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = lower, ymax = upper),
+                width = 0.3) +
+  theme_new() +
+  labs(color = "") +
+  scale_color_manual(values = vPGS_color_map) +
+  ylim(-0.2, 0.25) +
+  coord_flip() +
+  xlab("Score") +
+  ylab("Treatment coefficient and 95% CI\n(reg predicting Number of Children Ever Born;\ncontrol for first 5 PCs)") +
+  theme(legend.position = c(0.3, 0.5),
+        legend.background = element_blank()) +
+  geom_hline(yintercept = 0,
+             linetype = "dashed",
+             color = "red") +
+  guides(linetype = FALSE)
+
+ggsave('~/vgwas/figures/treatment_coef_levels_numc_compare.pdf',
+       plot = last_plot(),
+       device = "pdf",
+       height = 8,
+       width = 12)
+
+
+### BARCELLOS AND TURLEY EXTENSION
+## ukb data prep yob gxe train
+library(ggplot2)
+library(purrr)
+library(reshape2)
+library(dplyr)
+library(foreign)
+library(readstata13)
+library(lmtest)
+library(sandwich)
+library(multiwayvcov)
+
+make_table_ses = function(x, omit = NULL){
+
+  ys <- lapply(x, function(y) coeftest(y, vcov = vcovHC(y)))
+  zs <- lapply(x, function(z) summary(z))
+
+
+  r2s = lapply(zs, function(y) y$r.squared)
+  Ns = lapply(x, function(y) nobs(y))
+
+  # Get variable names
+  var_names = lapply(ys, FUN = function(y) rownames(y))
+  var_names = lapply(var_names, FUN = function(y) y[-1])
+
+  # Identify variables in every regression
+  in_all = Reduce(intersect,  var_names)
+
+  # Identify variables not in every regression
+  not_in_all = unlist(var_names)[!unlist(var_names) %in% in_all]
+
+  # Put unique variables at the top
+  full_list = unique(c(in_all, not_in_all))
+
+  # Find interactions
+  interaction_term = grepl(":", full_list)
+
+  # Put interactions at the bottom and Intercept at the very end
+  final_list = c(full_list[!interaction_term], full_list[interaction_term], "(Intercept)")
+
+  if(is.null(omit) == F){
+    final_list = final_list[!grepl(omit, final_list)]
+  }
+
+  all_cols = list()
+  for(i in ys){
+    coefficients = round(i[match(final_list, rownames(i)),'Estimate'], 4)
+    names(coefficients) = final_list
+    coefficients = ifelse(is.na(coefficients), "", coefficients)
+
+    # Grab signficance
+    sig = i[match(final_list, rownames(i)),"Pr(>|t|)"]
+
+    # Make stars from values
+    stars = rep("", length(sig))
+    stars = ifelse(sig < 0.1 & sig > 0.05, "†", stars)
+    stars = ifelse(sig < 0.05 & sig > 0.01, "*", stars)
+    stars = ifelse(sig < 0.01 & sig > 0.001, "**", stars)
+    stars = ifelse(sig < 0.001, "***", stars)
+    stars = ifelse(is.na(stars), "", stars)
+
+    # Add stars to the coefficients
+    coefficients = paste0(coefficients, stars)
+
+    # Grab SEs and round
+    ses = round(i[match(final_list, row.names(i)),"Std. Error"], 4)
+    ses = paste0("(", ses, ")")
+    ses = ifelse(ses == "(NA)", "", ses)
+
+    # Put it all together into a single alternating string (using rbind and c together)
+    all_cols[[length(all_cols) + 1]] = c(rbind(coefficients, ses))
+  }
+
+  df = do.call("cbind", all_cols)
+
+  # colnames are the primary (first) independent variable
+  df = as.data.frame(df, stringsAsFactors = F)
+  df = rbind(df, unlist(Ns))
+  df = rbind(df, round(unlist(r2s), 2))
+
+  df$Variable = c(rbind(final_list, rep("", length(final_list))), "N", "R-Squared")
+  return(df[,c(length(df), 1:(length(df)-1))])
+}
+
+# Triangular kernel weights
+kernelwts <- function (X, center, bw, kernel = "triangular") {
+  dist <- (X - center)/bw
+  if (kernel == "triangular") {
+    w <- (1 - abs(dist))
+  }
+  else if (kernel == "rectangular") {
+    w <- 1/2
+  }
+  else if (kernel == "epanechnikov") {
+    w <- 3/4 * (1 - dist^2)
+  }
+  else if (kernel == "quartic" | kernel == "biweight") {
+    w <- 15/16 * (1 - dist^2)^2
+  }
+  else if (kernel == "triweight") {
+    w <- 35/32 * (1 - dist^2)^3
+  }
+  else if (kernel == "tricube") {
+    w <- 70/81 * (1 - abs(dist)^3)^3
+  }
+  else if (kernel == "gaussian") {
+    w <- 1/sqrt(2 * pi) * exp(-1/2 * dist^2)
+  }
+  else if (kernel == "cosine") {
+    w <- pi/4 * cos(pi/2 * dist)
+  }
+  else {
+    stop("Invalid kernel selection.")
+  }
+  w <- ifelse(abs(dist) > 1 & kernel != "gaussian", 0, w)
+  w <- w/sum(w)
+  return(w)
+}
+
+# set working directory
+setwd("~/vgwas/")
+# ukb_pheno = readRDS("ukb_pheno_yob_gxe")
+
+# read in test data
+ukb_pheno = read.dta13("~/ukbiobank/pheno_Ukbio.dta")
+ukb_pheno = ukb_pheno[,which(!grepl("n_22009_0", colnames(ukb_pheno)))]
+
+# load in vpgs
+f <- function(x, newname = "var"){
+  colnames(x)[length(x)] = newname
+  return(x)
+}
+
+# create FID and IID vals
+ukb_pheno$FID = ukb_pheno$n_eid
+ukb_pheno$IID = ukb_pheno$n_eid
+
+# make date variables and subset to right time period
+ukb_pheno$month_birth = ukb_pheno$n_52_0_0
+ukb_pheno$yob = ukb_pheno$n_34_0_0.x
+ukb_pheno$year_month_birth = as.Date(paste(ukb_pheno$yob, ukb_pheno$month_birth, "01", sep = "-"))
+# add in birth days variable (for interpretability)
+ukb_pheno$year_month_birth_days <- as.numeric(ukb_pheno$year_month_birth-as.Date("1957-09-01"))
+#s attended recuritument
+split_ages <- strsplit(ukb_pheno$s_53_0_0, "")
+days <- unlist(lapply(split_ages, function(x) paste(x[1:2], collapse = "")))
+month_abb <- unlist(lapply(split_ages, function(x) paste(x[3:5], collapse = "")))
+years <- unlist(lapply(split_ages, function(x) paste(x[6:9], collapse = "")))
+months <- match(month_abb, month.abb)
+assessment_dates <- as.Date(paste0(years, "-",months, "-",days))
+ukb_pheno$assess_age <- as.numeric(assessment_dates-ukb_pheno$year_month_birth)
+
+# read in PGS
+bmi_pgs <- read.table("~/vgwas_scores/bmi_gwas_04_25_19.txt", header = T)
+ukb_pheno$locke_bmi_pgs <- bmi_pgs$SCORE[match(ukb_pheno$IID, bmi_pgs$IID)]
+
+# read vpgs
+all_vpgs = list.files("scores")
+all_vpgs = subset(all_vpgs, grepl("same_n", all_vpgs)|
+                    grepl("_resid.txt", all_vpgs)|
+                    grepl("_gwas_final", all_vpgs)|
+                    grepl("vqtl_final_with_alleles", all_vpgs)|
+                    grepl("hlmm.txt", all_vpgs)
+)
+
+all_vpgs_tabs = lapply(all_vpgs, function(x) read.table(x, stringsAsFactors = F, header = T))
+
+pgs_names <- gsub("~/vgwas/scores/", "", all_vpgs)
+pgs_names = unlist(lapply(strsplit(pgs_names, "\\."), function(x) x[1]))
+all_vpgs_tabs_corrected = lapply(all_vpgs_tabs, function(x) x[,c("IID", "SCORE")])
+all_vpgs_tabs_corrected = lapply(1:length(all_vpgs_tabs_corrected), function(x) f(all_vpgs_tabs_corrected[[x]], newname = pgs_names[x]))
+
+all_vpgs_tabs_corrected_df = all_vpgs_tabs_corrected %>% reduce(., merge)
+
+# merge in vpgs
+start_col <- 2
+last_col <- ncol(all_vpgs_tabs_corrected_df)
+
+ids1 = rep("m", length(colnames(all_vpgs_tabs_corrected_df)[start_col:last_col]))
+ids1 = ifelse(grepl("hlmm", colnames(all_vpgs_tabs_corrected_df)[start_col:last_col]), "hlmm", ids1)
+ids1 = ifelse(grepl("vqtl", colnames(all_vpgs_tabs_corrected_df)[start_col:last_col]), "lev", ids1)
+ids1 = ifelse(grepl("sib", colnames(all_vpgs_tabs_corrected_df)[start_col:last_col]), "sib", ids1)
+ids1 = ifelse(grepl("z_", colnames(all_vpgs_tabs_corrected_df)[start_col:last_col]), "z", ids1)
+
+ids2 = rep("bmi", length(colnames(all_vpgs_tabs_corrected_df)[start_col:last_col]))
+ids2 = ifelse(grepl("height", colnames(all_vpgs_tabs_corrected_df)[start_col:last_col]), "height", ids2)
+ids2 = ifelse(grepl("education", colnames(all_vpgs_tabs_corrected_df)[start_col:last_col]), "edu", ids2)
+ids2 = ifelse(grepl("num_child", colnames(all_vpgs_tabs_corrected_df)[start_col:last_col]), "numc", ids2)
+
+ids3 = rep("", length(colnames(all_vpgs_tabs_corrected_df)[start_col:last_col]))
+ids3 = ifelse(grepl("same_n", colnames(all_vpgs_tabs_corrected_df)[start_col:last_col]), "_sn", ids3)
+
+ids <- paste(ids1, ids2, sep = "_")
+ids <- paste(ids, ids3, sep = "")
+
+colnames(all_vpgs_tabs_corrected_df)[start_col:last_col] = ids
+pgs_names_2 = colnames(all_vpgs_tabs_corrected_df)[start_col:last_col]
+
+ukb_pheno = merge(ukb_pheno, all_vpgs_tabs_corrected_df, by = "IID")
+colnames(ukb_pheno)[colnames(ukb_pheno) == "z_bmi.y"] = "z_bmi"
+colnames(ukb_pheno)[colnames(ukb_pheno) == "z_height.y"] = "z_height"
+colnames(ukb_pheno)[colnames(ukb_pheno) == "z_edu.y"] = "z_edu"
+
+colnames(ukb_pheno)[colnames(ukb_pheno) == "z_bmi.x"] = "zscored_bmi"
+colnames(ukb_pheno)[colnames(ukb_pheno) == "z_height.x"] = "zscored_height"
+colnames(ukb_pheno)[colnames(ukb_pheno) == "z_edu.x"] = "zscored_edu"
+
+pgs_names_2 <- c("locke_bmi_pgs", pgs_names_2)
+
+# fix the hlmm ones
+ukb_pheno$hlmm_bmi_sn = ukb_pheno$hlmm_bmi_sn * -1
+ukb_pheno$hlmm_bmi = ukb_pheno$hlmm_bmi * -1
+ukb_pheno$hlmm_height_sn = ukb_pheno$hlmm_height_sn * -1
+ukb_pheno$hlmm_height = ukb_pheno$hlmm_height * -1
+ukb_pheno$hlmm_edu_sn = ukb_pheno$hlmm_edu_sn * -1
+ukb_pheno$hlmm_edu = ukb_pheno$hlmm_edu * -1
+ukb_pheno$hlmm_numc_sn = ukb_pheno$hlmm_numc_sn * -1
+ukb_pheno$hlmm_numc = ukb_pheno$hlmm_numc * -1
+
+# we use sex, age in days (at the time of the baseline assessment) and age squared,
+# dummies for ethnicity, dummies for country of birth, and dummies for calendar month of birth
+ukb_pheno$country_origin = ukb_pheno$n_20115_0_0
+ukb_pheno$ethnicity = ukb_pheno$n_21000_0
+ukb_pheno$post_reform = ifelse(ukb_pheno$year_month_birth >= as.Date("1957-09-01"), 1, 0)
+ukb_pheno$gender = ifelse(ukb_pheno$n_31_0_0.x == "Male", 1, 2)
+ukb_pheno$educ_depriv = ukb_pheno$n_26414_0_0
+ukb_pheno$white_british = ifelse(ukb_pheno$n_21000_0 == 1001, 1, 0)
+ukb_pheno$euro = ifelse(ukb_pheno$n_21000_0 %in% c(1, 1001, 1002, 1003), 1, 0)
+
+ukb_pheno$age_complete_schooling = ifelse(ukb_pheno$n_845_0_0 < 0, NA, ukb_pheno$n_845_0_0)
+ukb_pheno$edu16 = ifelse(ukb_pheno$age_complete_schooling >= 16, 1, 0)
+
+# Construct control variables
+ukb_pheno$sex <- as.numeric(ukb_pheno$n_31_0_0.x)
+ukb_pheno$age <- as.numeric(ukb_pheno$n_21003_0_0.x)
+ukb_pheno$age2 = ukb_pheno$age^2
+ukb_pheno$age3 = ukb_pheno$age^3
+ukb_pheno$age_sex = ukb_pheno$age * ukb_pheno$sex
+ukb_pheno$age2_sex = ukb_pheno$age2 * ukb_pheno$sex
+ukb_pheno$age3_sex = ukb_pheno$age3 * ukb_pheno$sex
+ukb_pheno$array <- ifelse(as.numeric(ukb_pheno$n_22000_0_0.x) > 0, 1, 0)
+colnames(ukb_pheno)[grepl("n_22009_0_", colnames(ukb_pheno))] = paste0("PC", 1:40)
+
+#bmi
+ukb_pheno$bmi<- as.numeric(ukb_pheno$n_21001_0_0)
+
+#waist to hip ratio
+ukb_pheno$waist <- as.numeric(ukb_pheno$n_48_0_0)
+ukb_pheno$hip <- as.numeric(ukb_pheno$n_49_0_0)
+ukb_pheno$waist_hip_ratio <- ukb_pheno$waist / ukb_pheno$hip
+
+# body fat percentage
+ukb_pheno$body_fat <- as.numeric(ukb_pheno$n_23099_0_0)
+
+#height
+ukb_pheno$height <- as.numeric(ukb_pheno$n_50_0_0)
+#education
+ukb_pheno$n_6138_0_0_recode = as.numeric(ukb_pheno$n_6138_0_0)
+
+new_val = rep(NA, length(ukb_pheno$n_6138_0_0_recode))
+new_val = ifelse(ukb_pheno$n_6138_0_0_recode == 1, 20, new_val)
+new_val = ifelse(ukb_pheno$n_6138_0_0_recode == 2, 13, new_val)
+new_val = ifelse(ukb_pheno$n_6138_0_0_recode == 3, 10, new_val)
+new_val = ifelse(ukb_pheno$n_6138_0_0_recode == 4, 10, new_val)
+new_val = ifelse(ukb_pheno$n_6138_0_0_recode == -7, 7, new_val)
+
+ukb_pheno$education = new_val
+
+ukb_pheno$attended_college <- ifelse(ukb_pheno$education == 20, 1, 0)
+
+# ukb_pheno$education_16
+ukb_pheno$edu16 <- ifelse(ukb_pheno$n_6138_0_0 == 1 | ukb_pheno$n_845_0_0 > 15, 1, 0)
+ukb_pheno$edu16  <- ifelse(ukb_pheno$n_845_0_0 %in% c(-1, -3), NA, ukb_pheno$edu16)
+ukb_pheno$edu16  <- ifelse(ukb_pheno$n_6138_0_0 %in% c(-3), NA, ukb_pheno$edu16)
+
+# D. Number of children ever born
+ukb_pheno$n_2405_0_0_recode = as.numeric(ukb_pheno$n_2405_0_0)
+ukb_pheno$n_2405_0_0_recode = ifelse(ukb_pheno$n_2405_0_0_recode < 0, NA, ukb_pheno$n_2405_0_0_recode)
+ukb_pheno$n_2734_0_0_recode = as.numeric(ukb_pheno$n_2734_0_0)
+ukb_pheno$n_2734_0_0_recode = ifelse(ukb_pheno$n_2734_0_0_recode < 0, NA, ukb_pheno$n_2734_0_0_recode)
+ukb_pheno$num_children = ifelse(is.na(ukb_pheno$n_2405_0_0_recode), ukb_pheno$n_2734_0_0_recode, ukb_pheno$n_2405_0_0_recode)
+ukb_pheno$num_children = ifelse(ukb_pheno$num_children > 15, NA, ukb_pheno$num_children)
+
+# country of birth
+ukb_pheno$country_birth <- ifelse(is.na(ukb_pheno$n_20115_0_0), ukb_pheno$n_1647_0_0, ukb_pheno$n_20115_0_0)
+ukb_pheno$country_birth <- ifelse(ukb_pheno$country_birth < 0, NA, ukb_pheno$country_birth)
+ukb_pheno$country_birth_england <-ifelse(ukb_pheno$n_1647_0_0 < 0, NA, ukb_pheno$n_1647_0_0)
+
+# subset to england scotland and wales
+ukb_pheno <- subset(ukb_pheno, country_birth_england %in% c(1,2,3))
+# and to relevant years (1947-1967)
+ukb_pheno <- subset(ukb_pheno, year_month_birth > as.Date("1947-09-01") & year_month_birth < as.Date("1967-08-31"))
+
+# rescaled by gender
+males_before_1957 <- ukb_pheno[(ukb_pheno$sex == 1 & (ukb_pheno$year_month_birth < as.Date("1957-09-01")) & (ukb_pheno$year_month_birth >= as.Date("1956-09-01"))),]
+females_before_1957 <- ukb_pheno[(ukb_pheno$sex == 2 & (ukb_pheno$year_month_birth < as.Date("1957-09-01")) & (ukb_pheno$year_month_birth >= as.Date("1956-09-01"))),]
+
+# bmi
+m_bmi_mean <- mean(males_before_1957$bmi, na.rm = T)
+m_bmi_sd <- sd(males_before_1957$bmi, na.rm = T)
+f_bmi_mean <- mean(females_before_1957$bmi, na.rm = T)
+f_bmi_sd <- sd(females_before_1957$bmi, na.rm = T)
+
+#waist to hip ratio
+m_w2h_mean <- mean(males_before_1957$waist_hip_ratio, na.rm = T)
+m_w2h_sd <- sd(males_before_1957$waist_hip_ratio, na.rm = T)
+f_w2h_mean <- mean(females_before_1957$waist_hip_ratio, na.rm = T)
+f_w2h_sd <- sd(females_before_1957$waist_hip_ratio, na.rm = T)
+
+# body fat percentage
+m_bfp_mean <- mean(males_before_1957$body_fat, na.rm = T)
+m_bfp_sd <- sd(males_before_1957$body_fat, na.rm = T)
+f_bfp_mean <- mean(females_before_1957$body_fat, na.rm = T)
+f_bfp_sd <- sd(females_before_1957$body_fat, na.rm = T)
+
+# limit to whites only
+ukb_pheno <- subset(ukb_pheno, euro == 1)
+# to those with good genetic data
+good_ids = na.omit(ukb_pheno$n_eid[is.na(ukb_pheno$n_22027_0) & ukb_pheno$n_22021_0_0 != 10 & is.na(ukb_pheno$n_22019_0)])
+ukb_pheno = ukb_pheno[ukb_pheno$n_eid %in% good_ids,]
+# to those in test set
+ukb_test = readRDS("~/vgwas/ukb_pheno_test.RDS")
+ukb_pheno <- subset(ukb_pheno, ukb_pheno$n_eid %in% ukb_test$n_eid)
+
+# now rescale by gender using values calculated above
+ukb_pheno$bmi_rescaled <- ukb_pheno$bmi
+ukb_pheno$bmi_rescaled[ukb_pheno$sex == 1] <- (ukb_pheno$bmi_rescaled[ukb_pheno$sex == 1]-m_bmi_mean)/m_bmi_sd
+ukb_pheno$bmi_rescaled[ukb_pheno$sex == 2] <- (ukb_pheno$bmi_rescaled[ukb_pheno$sex == 2]-f_bmi_mean)/f_bmi_sd
+
+# waist-to-hip ratio
+ukb_pheno$waist_hip_ratio_rescaled <- ukb_pheno$waist_hip_ratio
+ukb_pheno$waist_hip_ratio_rescaled[ukb_pheno$sex == 1] <- (ukb_pheno$waist_hip_ratio_rescaled[ukb_pheno$sex == 1]-m_w2h_mean)/m_w2h_sd
+ukb_pheno$waist_hip_ratio_rescaled[ukb_pheno$sex == 2] <- (ukb_pheno$waist_hip_ratio_rescaled[ukb_pheno$sex == 2]-f_w2h_mean)/f_w2h_sd
+
+# body fat
+ukb_pheno$body_fat_rescaled <- ukb_pheno$body_fat
+ukb_pheno$body_fat_rescaled[ukb_pheno$sex == 1] <- (ukb_pheno$body_fat_rescaled[ukb_pheno$sex == 1]-m_bfp_mean)/m_bfp_sd
+ukb_pheno$body_fat_rescaled[ukb_pheno$sex == 2] <- (ukb_pheno$body_fat_rescaled[ukb_pheno$sex == 2]-f_bfp_mean)/f_bfp_sd
+
+# calculate weights using covariance strategy from Anderson 2008
+weights <- rowSums(1/(var(ukb_pheno[,c("bmi_rescaled", "waist_hip_ratio_rescaled", "body_fat_rescaled")], na.rm = T)))
+# average value once weighted is final bodySize result
+ukb_pheno$bodySize <- ((ukb_pheno$bmi_rescaled * weights[1]) + (ukb_pheno$waist_hip_ratio_rescaled * weights[2]) + (ukb_pheno$body_fat_rescaled * weights[3]))/sum(weights)
+ukb_pheno$bodySize_above_threshold <- ifelse(ukb_pheno$bodySize > 1.036, 1, 0)
+
+# finally scale PCs and PGS
+ukb_pheno[,grepl("PC", colnames(ukb_pheno))] = sapply(ukb_pheno[,grepl("PC", colnames(ukb_pheno))], scale)
+
+# scale pgs
+scaled_vpgs = sapply(ukb_pheno[,pgs_names_2], scale)
+colnames(scaled_vpgs) = paste0(colnames(scaled_vpgs), "_scaled")
+ukb_pheno = cbind(ukb_pheno, scaled_vpgs)
+
+# polynomial, allowed to differ before and after reform
+ukb_pheno$poly2 <- NA
+ukb_pheno$poly2[ukb_pheno$post_reform == 0] <- poly(ukb_pheno$year_month_birth_days[ukb_pheno$post_reform == 0], degree = 2)[,2]
+ukb_pheno$poly2[ukb_pheno$post_reform == 1] <- poly(ukb_pheno$year_month_birth_days[ukb_pheno$post_reform == 1], degree = 2)[,2]
+
+# Triangular kernel weights
+ukb_pheno$obs_weights <- kernelwts(ukb_pheno$year_month_birth_days, center = 0, bw =3652.5)
+
+# ------------  Analyses
+##### ALL BMI
+bmi_vpgs_scaled <- grep("bmi", colnames(scaled_vpgs), value = T)
+bmi_vpgs_scaled <- subset(bmi_vpgs_scaled, !bmi_vpgs_scaled %in% c("locke_bmi_pgs_scaled", "m_bmi_scaled", "m_bmi_sn_scaled"))
+
+### NO DEMOGRAPHIC OR GENETIC CONTROLS
+all_lists <- list()
+for( i in bmi_vpgs_scaled ){
+  ukb_pheno$vpgs <- ukb_pheno[,i]
+  for(j in c("bodySize", "bodySize_above_threshold")){
+    ukb_pheno$outcome <- ukb_pheno[,j]
+
+    # reduced form from Appendix E table E3
+    reg_red_form_bmi <- lm(outcome ~ vpgs * post_reform, data = ukb_pheno, weights = ukb_pheno$obs_weights)
+
+    # first stage with PC * post_reform
+    reg_first_stage_bmi_m <- lm(edu16 ~ post_reform, data = ukb_pheno, na.action = na.exclude)
+
+    instrumented <- fitted.values(reg_first_stage_bmi_m)
+    ukb_pheno$instrumented_educ16 <- instrumented
+
+    #second stage - Does not fully match the paper - in the paper they find null results Table 2 bottom part/ but we find positive interaction/
+    # positive is opposite what they find in their overall models
+    reg_second_stage_bmi_m <-lm(outcome ~ vpgs * instrumented_educ16, data = ukb_pheno, weights = ukb_pheno$obs_weights)
+
+    # regs
+    all_lists[[length(all_lists) + 1]] <- list(reg_red_form_bmi, reg_first_stage_bmi_m, reg_second_stage_bmi_m)
+  }
+}
+
+all_lists_unlist <- unlist(all_lists, recursive = F)
+
+starting_pos <- seq(from = 1, to = length(all_lists_unlist), by = 6)
+end_pos <- seq(from = 6, to = length(all_lists_unlist), by = 6)
+
+for(i in 1:length(starting_pos)){
+  vpgs_val <- bmi_vpgs_scaled[i]
+  if(grepl("hlmm", vpgs_val)) to_paste <- "HLMM vPGS"
+  if(grepl("lev", vpgs_val)) to_paste <- "Levine's vPGS"
+  if(grepl("sib", vpgs_val)) to_paste <- "Sibling vPGS"
+  if(grepl("z_", vpgs_val)) to_paste <- "Squared Z-Score vPGS"
+  if(grepl("_sn_", vpgs_val)) to_paste <- paste(to_paste, "(Sibling N)")
+
+  writeLines(capture.output(stargazer(all_lists_unlist[starting_pos[i]:end_pos[i]],
+            type = "latex",
+            multicolumn = F,
+            omit = c("month", "PC", "as.factor", "sex", "age"),
+            header = F,
+            dep.var.labels = c("Body Size", "Educ16", "Body Size",  "Body Size (Threshold)", "Educ16",  "Body Size (Threshold)"),
+            covariate.labels = c("vPGS", "Post Reform", "Educ16 (Instr.)", "vPGS x Post Reform", "vPGS x Educ16 (Instr.)"),
+            column.labels = c("Reduced", "2SLS", "Reduced", "2SLS"),
+            column.separate = c(1, 2, 1, 2),
+            omit.stat = c("ser", "f"),
+            star.cutoffs = c(0.1, 0.05, 0.01, 0.001),
+            star.char = c("†", "*", "**", "***"),
+            notes = c("† p<0.1; * p<0.05; ** p<0.01; *** p<0.001"),
+            dep.var.caption = paste0(to_paste, ", No Controls"))), paste0("~/vgwas/stargazer_outputs/", vpgs_val, "_no_controls.txt"))
+}
+
+all_table = make_table_ses(all_lists_unlist)
+write.table(all_table, "~/vgwas/stargazer_outputs/barcellos_replication_test_no_controls.txt", row.names = F, quote = T, sep = "\t")
+
+
+### DEMOGRAPHIC BUT NO GENETIC CONTROLS
+all_lists <- list()
+for( i in bmi_vpgs_scaled ){
+  ukb_pheno$vpgs <- ukb_pheno[,i]
+  for(j in c("bodySize", "bodySize_above_threshold")){
+    ukb_pheno$outcome <- ukb_pheno[,j]
+
+    # reduced form from Appendix E table E3
+    reg_red_form_bmi <- lm(outcome ~ vpgs * post_reform + year_month_birth_days + poly2 + month_birth + sex + assess_age + (assess_age^2) + as.factor(country_birth_england), data = ukb_pheno, weights = ukb_pheno$obs_weights)
+
+    # first stage with PC * post_reform
+    reg_first_stage_bmi_m <- lm(edu16 ~ post_reform + year_month_birth_days + poly2 + month_birth + sex + assess_age + (assess_age^2) + as.factor(country_birth_england), data = ukb_pheno, na.action = na.exclude)
+
+    instrumented <- fitted.values(reg_first_stage_bmi_m)
+    ukb_pheno$instrumented_educ16 <- instrumented
+
+    #second stage - Does not fully match the paper - in the paper they find null results Table 2 bottom part/ but we find positive interaction/
+    # positive is opposite what they find in their overall models
+    reg_second_stage_bmi_m <-lm(outcome ~ vpgs * instrumented_educ16 + year_month_birth_days + poly2 + month_birth + sex + assess_age + (assess_age^2) + as.factor(country_birth_england), data = ukb_pheno, weights = ukb_pheno$obs_weights)
+
+    # regs
+    all_lists[[length(all_lists) + 1]] <- list(reg_red_form_bmi, reg_first_stage_bmi_m, reg_second_stage_bmi_m)
+  }
+}
+
+all_lists_unlist <- unlist(all_lists, recursive = F)
+
+starting_pos <- seq(from = 1, to = length(all_lists_unlist), by = 6)
+end_pos <- seq(from = 6, to = length(all_lists_unlist), by = 6)
+
+for(i in 1:length(starting_pos)){
+  vpgs_val <- bmi_vpgs_scaled[i]
+  if(grepl("hlmm", vpgs_val)) to_paste <- "HLMM vPGS"
+  if(grepl("lev", vpgs_val)) to_paste <- "Levine's vPGS"
+  if(grepl("sib", vpgs_val)) to_paste <- "Sibling vPGS"
+  if(grepl("z_", vpgs_val)) to_paste <- "Squared Z-Score vPGS"
+  if(grepl("_sn_", vpgs_val)) to_paste <- paste(to_paste, "(Sibling N)")
+
+  writeLines(capture.output(stargazer(all_lists_unlist[starting_pos[i]:end_pos[i]],
+            type = "latex",
+            multicolumn = F,
+            omit = c("month", "PC", "as.factor", "sex", "age"),
+            header = F,
+            dep.var.labels = c("Body Size", "Educ16", "Body Size",  "Body Size (Threshold)", "Educ16",  "Body Size (Threshold)"),
+            covariate.labels = c("vPGS", "Post Reform", "Educ16 (Instr.)", "vPGS x Post Reform", "vPGS x Educ16 (Instr.)"),
+            column.labels = c("Reduced", "2SLS", "Reduced", "2SLS"),
+            column.separate = c(1, 2, 1, 2),
+            omit.stat = c("ser", "f"),
+            star.cutoffs = c(0.1, 0.05, 0.01, 0.001),
+            star.char = c("†", "*", "**", "***"),
+            notes = c("† p<0.1; * p<0.05; ** p<0.01; *** p<0.001"),
+            dep.var.caption = paste0(to_paste, ", Demo Controls"))), paste0("~/stargazer_outputs/", vpgs_val, "_demo_controls.txt"))
+}
+
+all_table = make_table_ses(all_lists_unlist)
+write.table(all_table, "~/vgwas/stargazer_outputs/barcellos_replication_test_demo_controls.txt", row.names = F, quote = T, sep = "\t")
+
+
+## ALL CONTROLS
+all_lists <- list()
+for( i in bmi_vpgs_scaled ){
+  ukb_pheno$vpgs <- ukb_pheno[,i]
+  for(j in c("bodySize", "bodySize_above_threshold")){
+    ukb_pheno$outcome <- ukb_pheno[,j]
+
+    # reduced form from Appendix E table E3
+    reg_red_form_bmi <- lm(outcome ~ vpgs * post_reform + year_month_birth_days + poly2 + month_birth + sex + assess_age + (assess_age^2) + as.factor(country_birth_england) + m_edu_scaled + post_reform * m_edu_scaled + post_reform*PC1 + post_reform*PC2 + post_reform*PC3 + post_reform*PC4 + post_reform * PC5 + post_reform * PC6 + post_reform * PC7 + post_reform * PC8 + post_reform * PC9 + post_reform * PC10 + post_reform * PC11 + post_reform * PC12 + post_reform * PC13 + post_reform * PC14 + post_reform * PC15, data = ukb_pheno, weights = ukb_pheno$obs_weights)
+
+    # first stage with PC * post_reform
+    reg_first_stage_bmi_m <- lm(edu16 ~ post_reform + year_month_birth_days + poly2 + month_birth + sex + assess_age + (assess_age^2) + as.factor(country_birth_england), data = ukb_pheno, na.action = na.exclude)
+
+    instrumented <- fitted.values(reg_first_stage_bmi_m)
+    ukb_pheno$instrumented_educ16 <- instrumented
+
+    #second stage - Does not fully match the paper - in the paper they find null results Table 2 bottom part/ but we find positive interaction/
+    # positive is opposite what they find in their overall models
+    reg_second_stage_bmi_m <-lm(outcome ~ vpgs * instrumented_educ16 + year_month_birth_days + poly2 + month_birth + sex + assess_age + (assess_age^2) + as.factor(country_birth_england) +  m_edu_scaled + instrumented_educ16 * m_edu_scaled + instrumented_educ16 * PC1 + instrumented_educ16*PC2 + instrumented_educ16*PC3 + instrumented_educ16*PC4 + instrumented_educ16 * PC5 + instrumented_educ16 * PC6 + instrumented_educ16 * PC7 + instrumented_educ16 * PC8 + instrumented_educ16 * PC9 + instrumented_educ16 * PC10 + instrumented_educ16 * PC11 + instrumented_educ16 * PC12 + instrumented_educ16 * PC13 + instrumented_educ16 * PC14 + instrumented_educ16 * PC15, data = ukb_pheno, weights = ukb_pheno$obs_weights)
+
+    # regs
+    all_lists[[length(all_lists) + 1]] <- list(reg_red_form_bmi, reg_first_stage_bmi_m, reg_second_stage_bmi_m)
+  }
+}
+
+all_lists_unlist <- unlist(all_lists, recursive = F)
+
+starting_pos <- seq(from = 1, to = length(all_lists_unlist), by = 6)
+end_pos <- seq(from = 6, to = length(all_lists_unlist), by = 6)
+
+for(i in 1:length(starting_pos)){
+  vpgs_val <- bmi_vpgs_scaled[i]
+  if(grepl("hlmm", vpgs_val)) to_paste <- "HLMM vPGS"
+  if(grepl("lev", vpgs_val)) to_paste <- "Levine's vPGS"
+  if(grepl("sib", vpgs_val)) to_paste <- "Sibling vPGS"
+  if(grepl("z_", vpgs_val)) to_paste <- "Squared Z-Score vPGS"
+  if(grepl("_sn_", vpgs_val)) to_paste <- paste(to_paste, "(Sibling N)")
+
+  writeLines(capture.output(stargazer(all_lists_unlist[starting_pos[i]:end_pos[i]],
+            type = "latex",
+            multicolumn = F,
+            omit = c("month", "PC", "as.factor", "sex", "age", "poly2"),
+            header = F,
+            covariate.labels = c("vPGS", "Post Reform", "Educ16 (Instr.)", "mPGS", "vPGS x Post Reform", "mPGS x Post Reform", "vPGS x Educ16 (Instr.)", "mPGS x Educ16 (Instr.)"),
+            dep.var.labels = c("Body Size", "Educ16", "Body Size",  "Body Size (Threshold)", "Educ16",  "Body Size (Threshold)"),
+            column.labels = c("Reduced", "2SLS", "Reduced", "2SLS"),
+            column.separate = c(1, 2, 1, 2),
+            omit.stat = c("ser", "f"),
+            star.cutoffs = c(0.1, 0.05, 0.01, 0.001),
+            star.char = c("†", "*", "**", "***"),
+            notes = c("† p<0.1; * p<0.05; ** p<0.01; *** p<0.001"),
+            dep.var.caption = paste0(to_paste, ", All Controls"))), paste0("~/vgwas/stargazer_outputs/", vpgs_val, "_all_controls_mpgs_interaction_new_polynomial.txt"))
+}
+
+writeLines(capture.output(stargazer(all_lists_unlist[c(3,6, 15, 18)],
+                                    type = "latex",
+                                    multicolumn = F,
+                                    omit = c("month", "PC", "as.factor", "sex", "age", "poly2"),
+                                    header = F,
+                                    covariate.labels = c("vPGS", "Educ16 (Instr.)", "mPGS", "vPGS x Educ16 (Instr.)", "mPGS x Educ16 (Instr.)"),
+                                    dep.var.labels = c("Body Size", "Educ16", "Body Size",  "Body Size (Threshold)", "Educ16",  "Body Size (Threshold)"),
+                                    column.labels = c("HLMM", "HLMM", "Sib", "Sib"),
+                                    column.separate = c(1, 2, 1, 2),
+                                    omit.stat = c("ser", "f"),
+                                    star.cutoffs = c(0.1, 0.05, 0.01, 0.001),
+                                    star.char = c("†", "*", "**", "***"),
+                                    notes = c("† p<0.1; * p<0.05; ** p<0.01; *** p<0.001"),
+                                    dep.var.caption = "BMI, All Controls")), "~/vgwas/stargazer_outputs/barcellos_replication_hlmm_sib_mpgs_inter_new_polynomial.txt")
+
+
+
+
+
+all_table = make_table_ses(all_lists_unlist[c(3,6, 15, 18)])
+write.table(all_table, "~/vgwas/stargazer_outputs/barcellos_replication_hlmm_sib_mpgs_inter.txt", row.names = F, quote = T, sep = "\t")
+
+saveRDS(all_lists_unlist, "all_lists_unlist_bodySize_new_poly.RDS")
+
